@@ -62,7 +62,11 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {},
+      "eas": {
+        "projectId": "ed48510a-5690-4559-a498-8a74cec62f65"
+      }
+    },
+    "owner": "da-audix"
   }
 }
