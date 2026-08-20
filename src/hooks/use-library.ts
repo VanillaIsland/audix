@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
+  deleteTrackFile,
   importAuthorizedUrl,
   loadLibrary,
   loadPlaylists,
@@ -61,6 +62,30 @@ export function useLibrary() {
         track.id === id ? { ...track, lastPlayedAt: now, playCount: track.playCount + 1 } : track,
       ),
     );
+  }, []);
+
+  /** Drops a track everywhere: disk, library, playlists, and current selection. */
+  const deleteTrack = useCallback(async (id: string) => {
+    const target = tracks.find((track) => track.id === id);
+    if (!target) return;
+    await deleteTrackFile(target);
+    setTracks((existing) => existing.filter((track) => track.id !== id));
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.trackIds.includes(id)
+        ? { ...playlist, trackIds: playlist.trackIds.filter((trackId) => trackId !== id), updatedAt: new Date().toISOString() }
+        : playlist
+    )));
+    setCurrentId((value) => (value === id ? null : value));
+  }, [tracks]);
+
+  /** Metadata edit. Only descriptive fields — never uri, origin or id. */
+  const updateTrack = useCallback((id: string, changes: Partial<Pick<AudixTrack, 'title' | 'artist' | 'album'>>) => {
+    const clean = {
+      ...(changes.title !== undefined ? { title: changes.title.trim() || 'Sans titre' } : {}),
+      ...(changes.artist !== undefined ? { artist: changes.artist.trim() || 'Artiste inconnu' } : {}),
+      ...(changes.album !== undefined ? { album: changes.album.trim() || undefined } : {}),
+    };
+    setTracks((existing) => existing.map((track) => (track.id === id ? { ...track, ...clean } : track)));
   }, []);
 
   const createPlaylist = useCallback((name: string, color = '#6C32FF') => {
@@ -126,6 +151,8 @@ export function useLibrary() {
     importUrl,
     toggleFavorite,
     markPlayed,
+    deleteTrack,
+    updateTrack,
     createPlaylist,
     updatePlaylist,
     toggleTrackInPlaylist,

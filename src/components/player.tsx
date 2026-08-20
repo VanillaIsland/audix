@@ -46,10 +46,7 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
   };
 
   return (
-    <LinearGradient colors={Gradients.card} style={styles.card}>
-      <View style={styles.topSignal}>
-        <View style={styles.signalPurple} /><View style={styles.signalBlue} /><View style={styles.signalCyan} />
-      </View>
+    <View style={styles.card}>
 
       <View style={styles.topRow}>
         <View style={styles.coverWrap}>
@@ -156,16 +153,12 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
           <Text style={styles.pillText}>Importer</Text>
         </Pressable>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { position: 'relative', borderWidth: 1, borderColor: '#2A3248', borderRadius: 30, padding: 22, overflow: 'hidden' },
-  topSignal: { position: 'absolute', top: 0, left: 24, right: 24, height: 2, flexDirection: 'row' },
-  signalPurple: { flex: 1, backgroundColor: Colors.purple },
-  signalBlue: { flex: 1, backgroundColor: Colors.blue },
-  signalCyan: { flex: 1, backgroundColor: Colors.cyan },
+  card: { borderRadius: 20, padding: 18, backgroundColor: Colors.surface },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   coverWrap: { width: 64, height: 64, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#343A50' },
   cover: { width: '100%', height: '100%' },
@@ -182,10 +175,10 @@ const styles = StyleSheet.create({
   time: { color: Colors.textMuted, fontVariant: ['tabular-nums'], fontSize: 11 },
   quality: { color: Colors.textMuted, fontWeight: '700', fontSize: 9, letterSpacing: 1.1 },
   controls: { marginTop: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  playButton: { borderRadius: 32, shadowColor: Colors.purple, shadowOpacity: 0.5, shadowRadius: 18, shadowOffset: { width: 0, height: 7 } },
+  playButton: { borderRadius: 32 },
   playGradient: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
   repeatOneDot: { position: 'absolute', bottom: 8, width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.cyan },
   secondaryRow: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  pill: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: '#283149', backgroundColor: '#0B0F18' },
+  pill: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 17, backgroundColor: Colors.surfaceRaised },
   pillText: { color: Colors.text, fontWeight: '800', fontSize: 11 },
 });

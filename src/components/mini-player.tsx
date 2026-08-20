@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Gradients } from '@/constants/theme';
 import { usePlayback } from '@/lib/playback';
@@ -12,13 +13,15 @@ import { usePlayback } from '@/lib/playback';
  */
 export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
   const playback = usePlayback();
+  const insets = useSafeAreaInsets();
   const track = playback.current;
   if (!track) return null;
 
   const progress = playback.duration > 0 ? playback.currentTime / playback.duration : 0;
 
   return (
-    <View style={styles.wrap}>
+    // 55 = hauteur de la barre d'onglets, pour que le mini player se pose dessus
+    <View style={[styles.wrap, { bottom: 55 + Math.max(insets.bottom, 10) + 8 }]}>
       <View style={styles.progressTrack}>
         <LinearGradient
           colors={Gradients.brand}
@@ -66,7 +69,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute', left: 14, right: 14, bottom: 16, alignSelf: 'center', maxWidth: 720,
+    position: 'absolute', left: 12, right: 12, alignSelf: 'center', maxWidth: 720,
     minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10,
     paddingLeft: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2A3248',
     backgroundColor: 'rgba(9,12,20,0.97)', overflow: 'hidden', zIndex: 15,

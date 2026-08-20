@@ -10,6 +10,8 @@ import { GrabPanel } from '@/components/grab-panel';
 import { MiniPlayer } from '@/components/mini-player';
 import { Player } from '@/components/player';
 import { PlaylistsPanel } from '@/components/playlists-panel';
+import { TabBar, type TabItem } from '@/components/tab-bar';
+import { TrackActions } from '@/components/track-actions';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { usePlayback } from '@/lib/playback';
@@ -27,13 +29,22 @@ const SECTIONS: { key: Section; label: string; caption: string; icon: keyof type
   { key: 'grab', label: 'Grab', caption: 'Ingest', icon: 'magnet-outline' },
 ];
 
+// Grab est une action, pas une destination : il vit dans l'en-tete.
+const TABS: readonly TabItem<Exclude<Section, 'grab'>>[] = [
+  { key: 'play', label: 'Lecture', icon: 'play-circle-outline', iconActive: 'play-circle' },
+  { key: 'recent', label: 'Récents', icon: 'time-outline', iconActive: 'time' },
+  { key: 'downloads', label: 'Offline', icon: 'cloud-download-outline', iconActive: 'cloud-download' },
+  { key: 'favorites', label: 'Favoris', icon: 'heart-outline', iconActive: 'heart' },
+  { key: 'playlists', label: 'Playlists', icon: 'albums-outline', iconActive: 'albums' },
+];
+
 const ORIGIN_LABELS: Record<MediaOrigin, string> = {
   local: 'LOCAL', direct: 'DIRECT', 'youtube-export': 'YOUTUBE', 'facebook-export': 'FACEBOOK', 'spotify-catalog': 'SPOTIFY',
 };
 
 const sizeLabel = (bytes?: number) => !bytes ? 'STREAM' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.round(bytes / 1_000)} KB`;
 
-function TrackRow({ track, active, onSelect, onFavorite }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void }) {
+function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
   return (
     <View style={[styles.trackRow, active && styles.trackRowActive]}>
       <Pressable onPress={onSelect} style={styles.trackMain}>
@@ -44,6 +55,7 @@ function TrackRow({ track, active, onSelect, onFavorite }: { track: AudixTrack; 
       {track.downloaded ? <Ionicons name="checkmark-circle" color={Colors.success} size={17} /> : null}
       <Pressable accessibilityLabel={track.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={onFavorite} hitSlop={10} style={styles.rowIconButton}><Ionicons name={track.favorite ? 'heart' : 'heart-outline'} color={track.favorite ? Colors.purple : Colors.textMuted} size={20} /></Pressable>
       <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={onSelect} hitSlop={8} style={styles.rowIconButton}><Ionicons name={active ? 'volume-high' : 'play'} color={Colors.cyan} size={19} /></Pressable>
+      <Pressable accessibilityLabel={`Actions pour ${track.title}`} onPress={onMore} hitSlop={8} style={styles.rowIconButton}><Ionicons name="ellipsis-horizontal" color={Colors.textMuted} size={19} /></Pressable>
     </View>
   );
 }
@@ -63,6 +75,7 @@ export default function HomeScreen() {
   const [grabPlaylistId, setGrabPlaylistId] = useState<string | null>(null);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [deletePlaylist, setDeletePlaylist] = useState<AudixPlaylist | null>(null);
+  const [actionTrack, setActionTrack] = useState<AudixTrack | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
   const visibleTracks = useMemo(() => {
@@ -128,20 +141,27 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.gridBackdrop}>{Array.from({ length: 10 }).map((_, index) => <View key={index} style={styles.gridLine} />)}</View>
-      <View style={styles.orbPurple} /><View style={styles.orbBlue} /><View style={styles.orbCyan} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
           <View style={styles.topbar}>
-            <View style={styles.brandBlock}><Image source={require('@/assets/brand/audix-wordmark.png')} style={styles.wordmark} resizeMode="contain" /><View style={styles.versionPill}><View style={styles.versionDot} /><Text style={styles.versionText}>CORE 0.2 · ONLINE</Text></View></View>
-            <View style={styles.topStats}><View style={styles.topStat}><Text style={styles.topStatValue}>{library.tracks.length}</Text><Text style={styles.topStatLabel}>TITRES</Text></View><View style={styles.topStat}><Text style={styles.topStatValue}>{library.playlists.length}</Text><Text style={styles.topStatLabel}>PLAYLISTS</Text></View><View style={styles.privateBadge}><Ionicons name="lock-closed" size={11} color={Colors.success} /><Text style={styles.privateText}>PRIVATE CATALOG</Text></View></View>
+            <Image source={require('@/assets/brand/audix-wordmark.png')} style={styles.wordmark} resizeMode="contain" />
+            <View style={styles.topbarCopy}>
+              <Text style={styles.topbarTitle}>{currentSection.label}</Text>
+              <Text style={styles.topbarMeta}>
+                {library.tracks.length} titre{library.tracks.length !== 1 ? 's' : ''} · {library.playlists.length} playlist{library.playlists.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Ouvrir Grab"
+              accessibilityState={{ selected: section === 'grab' }}
+              onPress={() => navigate('grab')}
+              style={[styles.headerAction, section === 'grab' && styles.headerActionOn]}>
+              <Ionicons name="magnet-outline" size={20} color={section === 'grab' ? Colors.cyan : Colors.text} />
+            </Pressable>
           </View>
 
-          <View style={styles.heroBand}><View style={styles.heroCopy}><Text style={styles.heroEyebrow}>INTELLIGENT · IMMERSIVE · YOURS</Text><Text style={styles.heroTitle}>Your sound. <Text style={styles.heroAccent}>One orbit.</Text></Text><Text style={styles.heroText}>Masters locaux, streams officiels et collections privées réunis dans une seule interface audio.</Text></View><View style={styles.heroWave}>{[14, 26, 44, 66, 35, 78, 48, 28, 56, 36, 18].map((height, index) => <LinearGradient key={index} colors={Gradients.brand} style={[styles.heroBar, { height }]} />)}</View></View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.nav}>{SECTIONS.map((item) => { const active = section === item.key; return <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={`Ouvrir ${item.label}`} accessibilityState={{ selected: active }} onPress={() => navigate(item.key)} style={[styles.navItem, active && styles.navItemActive]}>{active ? <LinearGradient colors={Gradients.brand} style={styles.navSignal} /> : null}<View style={[styles.navIcon, active && styles.navIconActive]}><Ionicons name={item.icon} size={18} color={active ? Colors.cyan : Colors.textMuted} /></View><View><Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text><Text style={styles.navCaption}>{item.caption}</Text></View></Pressable>; })}</ScrollView>
 
-          <View style={styles.sectionMarker}><View style={styles.sectionMarkerLine} /><Text style={styles.sectionMarkerText}>{currentSection.caption.toUpperCase()} MODULE</Text><View style={styles.sectionMarkerLine} /></View>
 
           {section === 'play' ? <View style={styles.sectionStack}>
             <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
@@ -153,40 +173,60 @@ export default function HomeScreen() {
 
           {section === 'playlists' ? <PlaylistsPanel playlists={library.playlists} tracks={library.tracks} currentId={library.currentId} selectedId={selectedPlaylistId} onSelect={setSelectedPlaylistId} onCreate={library.createPlaylist} onUpdate={library.updatePlaylist} onToggleTrack={library.toggleTrackInPlaylist} onPlay={(id) => selectTrack(id, true)} onRequestDelete={setDeletePlaylist} onImport={importFiles} onGrab={() => { setGrabPlaylistId(selectedPlaylistId); setSection('grab'); }} /> : null}
 
-          {section !== 'play' && section !== 'grab' && section !== 'playlists' ? <LibraryPanel title={currentSection.label} eyebrow={`${currentSection.caption.toUpperCase()} VAULT`} tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id, true)} onFavorite={library.toggleFavorite} emptyIcon={section === 'favorites' ? 'heart-outline' : section === 'downloads' ? 'cloud-download-outline' : 'time-outline'} emptyTitle={section === 'favorites' ? 'Aucun favori signalé' : section === 'downloads' ? 'Le coffre offline est vide' : 'Aucune écoute récente'} onEmptyAction={() => navigate('grab')} /> : null}
+          {section !== 'play' && section !== 'grab' && section !== 'playlists' ? <LibraryPanel title={currentSection.label} eyebrow={`${currentSection.caption.toUpperCase()} VAULT`} tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id, true)} onFavorite={library.toggleFavorite} onMore={setActionTrack} emptyIcon={section === 'favorites' ? 'heart-outline' : section === 'downloads' ? 'cloud-download-outline' : 'time-outline'} emptyTitle={section === 'favorites' ? 'Aucun favori signalé' : section === 'downloads' ? 'Le coffre offline est vide' : 'Aucune écoute récente'} onEmptyAction={() => navigate('grab')} /> : null}
 
-          {section === 'play' ? <LibraryPanel title="Bibliothèque" eyebrow="LOCAL-FIRST VAULT" tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id)} onFavorite={library.toggleFavorite} emptyIcon="pulse-outline" emptyTitle="Ton univers audio attend son premier signal" onEmptyAction={() => navigate('grab')} /> : null}
+          {section === 'play' ? <LibraryPanel title="Bibliothèque" eyebrow="LOCAL-FIRST VAULT" tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id)} onFavorite={library.toggleFavorite} onMore={setActionTrack} emptyIcon="pulse-outline" emptyTitle="Ton univers audio attend son premier signal" onEmptyAction={() => navigate('grab')} /> : null}
 
           <View style={styles.footer}><Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.footerIcon} /><Text style={styles.footerBrand}>DA AUDIX · SMART AUDIO PLAYER · MVP 0.1</Text></View>
         </ScrollView>
       </SafeAreaView>
 
       {section !== 'play' ? <MiniPlayer onOpen={() => setSection('play')} /> : null}
+      <TabBar
+        items={TABS}
+        active={(section === 'grab' ? 'play' : section) as Exclude<Section, 'grab'>}
+        onChange={navigate}
+      />
       {notice ? <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === 'danger' ? styles.noticeDanger : notice.tone === 'success' ? styles.noticeSuccess : styles.noticeInfo]}><Ionicons name={notice.tone === 'danger' ? 'alert-circle' : notice.tone === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={notice.tone === 'danger' ? Colors.danger : notice.tone === 'success' ? Colors.success : Colors.cyan} /><Text style={styles.noticeText}>{notice.text}</Text><Ionicons name="close" size={16} color={Colors.textMuted} /></Pressable> : null}
+      <TrackActions
+        track={actionTrack}
+        onClose={() => setActionTrack(null)}
+        onSave={(id, changes) => { library.updateTrack(id, changes); showNotice({ tone: 'success', text: 'Informations mises à jour.' }); }}
+        onDelete={(id) => {
+          library.deleteTrack(id).catch(() => undefined);
+          showNotice({ tone: 'success', text: 'Titre supprimé de la bibliothèque.' });
+        }}
+        onToggleFavorite={(id) => { library.toggleFavorite(id); setActionTrack((t) => (t ? { ...t, favorite: !t.favorite } : t)); }}
+      />
       <ConfirmDialog visible={Boolean(deletePlaylist)} title="Supprimer cette playlist ?" message={deletePlaylist ? `« ${deletePlaylist.name} » sera supprimée. Les titres resteront dans ta bibliothèque Audix.` : ''} onCancel={() => setDeletePlaylist(null)} onConfirm={() => { if (deletePlaylist) library.deletePlaylist(deletePlaylist.id); setSelectedPlaylistId(null); setDeletePlaylist(null); showNotice({ tone: 'success', text: 'Playlist supprimée. Tes médias sont intacts.' }); }} />
     </View>
   );
 }
 
-function LibraryPanel({ title, eyebrow, tracks, currentId, query, onQuery, onSelect, onFavorite, emptyIcon, emptyTitle, onEmptyAction }: { title: string; eyebrow: string; tracks: AudixTrack[]; currentId: string | null; query: string; onQuery: (value: string) => void; onSelect: (id: string) => void; onFavorite: (id: string) => void; emptyIcon: keyof typeof Ionicons.glyphMap; emptyTitle: string; onEmptyAction: () => void }) {
-  return <View style={styles.librarySection}><View style={styles.libraryHeader}><View><Text style={styles.libraryEyebrow}>{eyebrow}</Text><Text style={styles.libraryTitle}>{title}</Text><Text style={styles.librarySubtitle}>{tracks.length} source{tracks.length !== 1 ? 's' : ''}</Text></View><View style={styles.searchBox}><Ionicons name="search" size={16} color={Colors.textMuted} /><TextInput value={query} onChangeText={onQuery} placeholder="Titre, artiste, album" placeholderTextColor="#50586F" style={styles.searchInput} /></View></View>{tracks.length ? tracks.map((track) => <TrackRow key={track.id} track={track} active={track.id === currentId} onSelect={() => onSelect(track.id)} onFavorite={() => onFavorite(track.id)} />) : <EmptyState icon={emptyIcon} title={emptyTitle} copy="Importe un master ou ajoute une référence YouTube, Spotify ou Facebook avec Grab." action="Lancer Grab" onAction={onEmptyAction} />}</View>;
+function LibraryPanel({ title, eyebrow, tracks, currentId, query, onQuery, onSelect, onFavorite, onMore, emptyIcon, emptyTitle, onEmptyAction }: { title: string; eyebrow: string; tracks: AudixTrack[]; currentId: string | null; query: string; onQuery: (value: string) => void; onSelect: (id: string) => void; onFavorite: (id: string) => void; onMore: (track: AudixTrack) => void; emptyIcon: keyof typeof Ionicons.glyphMap; emptyTitle: string; onEmptyAction: () => void }) {
+  return <View style={styles.librarySection}><View style={styles.libraryHeader}><View><Text style={styles.libraryEyebrow}>{eyebrow}</Text><Text style={styles.libraryTitle}>{title}</Text><Text style={styles.librarySubtitle}>{tracks.length} source{tracks.length !== 1 ? 's' : ''}</Text></View><View style={styles.searchBox}><Ionicons name="search" size={16} color={Colors.textMuted} /><TextInput value={query} onChangeText={onQuery} placeholder="Titre, artiste, album" placeholderTextColor="#50586F" style={styles.searchInput} /></View></View>{tracks.length ? tracks.map((track) => <TrackRow key={track.id} track={track} active={track.id === currentId} onSelect={() => onSelect(track.id)} onFavorite={() => onFavorite(track.id)} onMore={() => onMore(track)} />) : <EmptyState icon={emptyIcon} title={emptyTitle} copy="Importe un master ou ajoute une référence YouTube, Spotify ou Facebook avec Grab." action="Lancer Grab" onAction={onEmptyAction} />}</View>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, overflow: 'hidden', backgroundColor: Colors.background }, safeArea: { flex: 1 }, page: { width: '100%', maxWidth: 1180, alignSelf: 'center', gap: 20, paddingHorizontal: 22, paddingBottom: 108 },
+  screen: { flex: 1, overflow: 'hidden', backgroundColor: Colors.background }, safeArea: { flex: 1 }, page: { width: '100%', maxWidth: 1180, alignSelf: 'center', gap: 20, paddingHorizontal: 18, paddingBottom: 24 },
   gridBackdrop: { position: 'absolute', inset: 0, flexDirection: 'row', justifyContent: 'space-around', opacity: 0.22 }, gridLine: { width: 1, height: '100%', backgroundColor: '#141A28' },
   orbPurple: { position: 'absolute', width: 520, height: 520, borderRadius: 260, top: -280, left: -300, backgroundColor: 'rgba(167,27,255,0.11)' }, orbBlue: { position: 'absolute', width: 400, height: 400, borderRadius: 200, top: 300, left: '38%', backgroundColor: 'rgba(36,107,255,0.045)' }, orbCyan: { position: 'absolute', width: 460, height: 460, borderRadius: 230, top: 70, right: -330, backgroundColor: 'rgba(0,216,232,0.09)' },
-  topbar: { width: '100%', alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 8 }, brandBlock: { width: '100%', alignItems: 'center', justifyContent: 'center', gap: 9 }, wordmark: { width: 96, height: 96, borderRadius: 24 },
+  topbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
+  topbarCopy: { flex: 1, minWidth: 0 },
+  topbarTitle: { color: Colors.text, fontSize: 20, fontWeight: '800' },
+  topbarMeta: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
+  headerAction: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+  headerActionOn: { borderColor: Colors.cyan, backgroundColor: '#0B2630' }, brandBlock: { width: '100%', alignItems: 'center', justifyContent: 'center', gap: 9 }, wordmark: { width: 40, height: 40, borderRadius: 12 },
   versionPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 15, paddingVertical: 9, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#263047', backgroundColor: '#0B0F18' }, versionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success }, versionText: { color: Colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 1.3, textAlign: 'center' },
   topStats: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 10 }, topStat: { minWidth: 66, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 15, backgroundColor: '#0B0F18' }, topStatValue: { color: Colors.text, fontSize: 15, fontWeight: '900' }, topStatLabel: { color: Colors.textMuted, fontSize: 7, fontWeight: '900', letterSpacing: 1 },
   privateBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 9, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#245346', backgroundColor: '#091B17' }, privateText: { color: Colors.success, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
   heroBand: { minHeight: 140, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 22, padding: 23, borderRadius: 30, borderWidth: 1, borderColor: '#242C40', backgroundColor: 'rgba(10,13,21,0.86)' }, heroCopy: { flex: 1, minWidth: 280, alignItems: 'center', gap: 5 }, heroEyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 2.2, textAlign: 'center' }, heroTitle: { color: Colors.text, fontSize: 34, lineHeight: 39, fontWeight: '900', letterSpacing: -1.1, textAlign: 'center' }, heroAccent: { color: Colors.purple }, heroText: { width: '100%', maxWidth: 620, color: Colors.textMuted, fontSize: 11, lineHeight: 17, textAlign: 'center' }, heroWave: { height: 92, minWidth: 260, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 15 }, heroBar: { width: 6, borderRadius: 6 },
   nav: { gap: 9, paddingVertical: 1 }, navItem: { position: 'relative', minWidth: 145, minHeight: 61, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: '#252D41', backgroundColor: 'rgba(11,15,24,0.91)' }, navItemActive: { borderColor: '#31516B', backgroundColor: '#101925' }, navSignal: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 3 }, navIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#121725' }, navIconActive: { backgroundColor: '#0B2630' }, navText: { color: Colors.textMuted, fontSize: 11, fontWeight: '800' }, navTextActive: { color: Colors.text }, navCaption: { color: '#4F586F', fontSize: 7, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
   sectionMarker: { flexDirection: 'row', alignItems: 'center', gap: 10 }, sectionMarkerLine: { flex: 1, height: 1, backgroundColor: '#1B2233' }, sectionMarkerText: { color: '#566078', fontSize: 7, fontWeight: '900', letterSpacing: 1.8 }, sectionStack: { gap: 16 },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, quickAction: { flex: 1, minWidth: 260, minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 11, borderRadius: 20, borderWidth: 1, borderColor: '#252D41', backgroundColor: '#0C1019' }, quickIcon: { width: 43, height: 43, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#0B202A' }, quickIconPurple: { backgroundColor: '#21102F' }, quickCopy: { flex: 1, gap: 2 }, quickTitle: { color: Colors.text, fontSize: 11, fontWeight: '900' }, quickText: { color: Colors.textMuted, fontSize: 8 },
-  librarySection: { gap: 10, padding: 20, borderRadius: 28, borderWidth: 1, borderColor: '#242C40', backgroundColor: 'rgba(10,13,21,0.9)' }, libraryHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 3 }, libraryEyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 1.7 }, libraryTitle: { color: Colors.text, fontSize: 23, fontWeight: '900', marginTop: 3 }, librarySubtitle: { color: Colors.textMuted, fontSize: 9, marginTop: 2 }, searchBox: { width: 230, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#283149', backgroundColor: '#080B12' }, searchInput: { flex: 1, height: 40, color: Colors.text, fontSize: 10 },
-  trackRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 9, borderRadius: 19, borderWidth: 1, borderColor: '#242C40', backgroundColor: '#0B0F18' }, trackRowActive: { borderColor: '#31516B', backgroundColor: '#0F1824' }, trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }, trackIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 15 }, trackMeta: { flex: 1, minWidth: 0 }, trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '900' }, trackArtist: { color: Colors.textMuted, fontSize: 9, marginTop: 3 }, sourceBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: '#121827' }, sourceText: { color: Colors.textMuted, fontSize: 7, fontWeight: '900', letterSpacing: 0.6 }, rowIconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
+  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, quickAction: { flex: 1, minWidth: 240, minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 11, borderRadius: 16, backgroundColor: Colors.surface }, quickIcon: { width: 43, height: 43, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#0B202A' }, quickIconPurple: { backgroundColor: '#21102F' }, quickCopy: { flex: 1, gap: 2 }, quickTitle: { color: Colors.text, fontSize: 11, fontWeight: '900' }, quickText: { color: Colors.textMuted, fontSize: 8 },
+  librarySection: { gap: 10, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface }, libraryHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 3 }, libraryEyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 1.7 }, libraryTitle: { color: Colors.text, fontSize: 23, fontWeight: '900', marginTop: 3 }, librarySubtitle: { color: Colors.textMuted, fontSize: 9, marginTop: 2 }, searchBox: { width: 230, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#283149', backgroundColor: '#080B12' }, searchInput: { flex: 1, height: 40, color: Colors.text, fontSize: 10 },
+  trackRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 8, borderRadius: 14, backgroundColor: Colors.surfaceRaised }, trackRowActive: { backgroundColor: '#12233A' }, trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }, trackIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 15 }, trackMeta: { flex: 1, minWidth: 0 }, trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '900' }, trackArtist: { color: Colors.textMuted, fontSize: 9, marginTop: 3 }, sourceBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: '#121827' }, sourceText: { color: Colors.textMuted, fontSize: 7, fontWeight: '900', letterSpacing: 0.6 }, rowIconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
   emptyState: { alignItems: 'center', gap: 9, padding: 35, borderRadius: 23, borderWidth: 1, borderStyle: 'dashed', borderColor: '#293149', backgroundColor: 'rgba(8,11,18,0.72)' }, emptyOrbit: { width: 62, height: 62, padding: 2, borderRadius: 22, borderWidth: 1, borderColor: '#303951' }, emptyIcon: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }, emptyTitle: { color: Colors.text, fontSize: 16, fontWeight: '900', textAlign: 'center' }, emptyCopy: { maxWidth: 520, color: Colors.textMuted, fontSize: 10, lineHeight: 16, textAlign: 'center' }, emptyAction: { minHeight: 43, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#2D3851', backgroundColor: '#101521' }, emptyActionText: { color: Colors.text, fontSize: 9, fontWeight: '900' },
   footer: { width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 18 }, footerIcon: { width: 46, height: 46, borderRadius: 15 }, footerBrand: { color: '#626B82', fontSize: 8, fontWeight: '900', letterSpacing: 1.15, textAlign: 'center' },
-  notice: { position: 'absolute', left: 20, right: 20, bottom: 90, alignSelf: 'center', maxWidth: 640, minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 15, borderRadius: 18, borderWidth: 1, zIndex: 20 }, noticeSuccess: { borderColor: '#28604F', backgroundColor: '#0B211B' }, noticeDanger: { borderColor: '#5C2737', backgroundColor: '#241019' }, noticeInfo: { borderColor: '#27566A', backgroundColor: '#0B1E27' }, noticeText: { flex: 1, color: Colors.text, fontSize: 10, lineHeight: 15, fontWeight: '700' },
+  notice: { position: 'absolute', left: 16, right: 16, bottom: 150, alignSelf: 'center', maxWidth: 640, minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 15, borderRadius: 18, borderWidth: 1, zIndex: 20 }, noticeSuccess: { borderColor: '#28604F', backgroundColor: '#0B211B' }, noticeDanger: { borderColor: '#5C2737', backgroundColor: '#241019' }, noticeInfo: { borderColor: '#27566A', backgroundColor: '#0B1E27' }, noticeText: { flex: 1, color: Colors.text, fontSize: 10, lineHeight: 15, fontWeight: '700' },
 });

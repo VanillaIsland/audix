@@ -211,3 +211,18 @@ export function describeLink(url: string) {
     return { type: 'invalid' as const, label: 'URL invalide', origin: 'direct' as const };
   }
 }
+
+/**
+ * Removes the on-disk copy of an offline track. Best-effort: a missing file is
+ * not an error, the library entry is dropped either way.
+ */
+export async function deleteTrackFile(track: AudixTrack): Promise<void> {
+  if (!track.downloaded || Platform.OS === 'web') return;
+  if (!track.uri.startsWith('file:')) return;
+  try {
+    const file = new File(track.uri);
+    if (file.exists) file.delete();
+  } catch {
+    // Disk removal failed; the entry still leaves the library.
+  }
+}
