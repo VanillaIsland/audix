@@ -42,7 +42,7 @@ export function CatalogSearch({ onAddLink }: { onAddLink: (url: string) => Promi
     <View style={styles.card}>
       <View style={styles.heading}>
         <View style={styles.searchIcon}><Ionicons name="search" size={22} color={Colors.cyan} /></View>
-        <View style={styles.headingCopy}><Text style={styles.eyebrow}>CATALOG ORBIT</Text><Text style={styles.title}>Recherche titre + artiste</Text><Text style={styles.subtitle}>Trouve une référence officielle, puis ajoute-la au lecteur Voxa.</Text></View>
+        <View style={styles.headingCopy}><Text style={styles.eyebrow}>CATALOG ORBIT</Text><Text style={styles.title}>Recherche titre + artiste</Text><Text style={styles.subtitle}>Trouve une référence officielle, puis ajoute-la au lecteur Audix.</Text></View>
         <View style={[styles.apiPill, youtubeKey ? styles.apiPillOn : null]}><View style={[styles.apiDot, youtubeKey ? styles.apiDotOn : null]} /><Text style={styles.apiText}>YT API {youtubeKey ? 'ON' : 'À CONNECTER'}</Text></View>
       </View>
       <View style={styles.searchBar}>

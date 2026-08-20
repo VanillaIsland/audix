@@ -5,9 +5,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Radius } from '@/constants/theme';
 import { embedUrlFor, platformFromUrl } from '@/lib/platforms';
-import type { VoxaTrack } from '@/types/media';
+import type { AudixTrack } from '@/types/media';
 
-export function ExternalPlayer({ track, onToggleFavorite }: { track: VoxaTrack; onToggleFavorite: (id: string) => void }) {
+export function ExternalPlayer({ track, onToggleFavorite }: { track: AudixTrack; onToggleFavorite: (id: string) => void }) {
   const source = track.externalUrl ?? track.uri;
   const embedUrl = embedUrlFor(source);
   const platform = platformFromUrl(source);

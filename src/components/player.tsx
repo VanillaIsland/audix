@@ -1,121 +1,160 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Waveform } from '@/components/waveform';
 import { ExternalPlayer } from '@/components/external-player';
+import { Waveform } from '@/components/waveform';
 import { Colors, Gradients } from '@/constants/theme';
-import type { VoxaTrack } from '@/types/media';
+import { PLAYBACK_RATES, usePlayback } from '@/lib/playback';
+import type { AudixTrack } from '@/types/media';
 
 const formatTime = (seconds: number) => {
-  if (!Number.isFinite(seconds)) return '0:00';
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const minutes = Math.floor(seconds / 60);
   return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 };
 
+const REPEAT_ICON = {
+  none: 'repeat-outline',
+  all: 'repeat',
+  one: 'repeat',
+} as const;
+
 type Props = {
-  track: VoxaTrack | null;
+  track: AudixTrack | null;
   onImport: () => void;
-  onPlayed: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 };
 
-export function Player({ track, onImport, onPlayed, onToggleFavorite }: Props) {
-  const player = useAudioPlayer(null, { updateInterval: 250 });
-  const status = useAudioPlayerStatus(player);
-  const [rate, setRate] = useState(1);
-  const playedId = useRef<string | null>(null);
+export function Player({ track, onImport, onToggleFavorite }: Props) {
+  const playback = usePlayback();
 
-  useEffect(() => {
-    player.pause();
-    if (!track || track.externalUrl) return;
-    player.replace(track.uri);
-    if (Platform.OS !== 'web') {
-      player.setActiveForLockScreen(true, {
-        title: track.title,
-        artist: track.artist,
-        albumTitle: track.album ?? 'Voxa — Catalogue propriétaire',
-      });
-    }
-  }, [player, track]);
-
-  const progress = useMemo(() => (status.duration ? status.currentTime / status.duration : 0), [status.currentTime, status.duration]);
-
-  const togglePlay = () => {
-    if (!track) return onImport();
-    if (status.playing) return player.pause();
-    if (playedId.current !== track.id) {
-      playedId.current = track.id;
-      onPlayed(track.id);
-    }
-    player.play();
-  };
-
+  // Platform references (YouTube / Spotify / Facebook) are streamed by their
+  // official embed, never by the audio engine.
   if (track?.externalUrl) {
     return <ExternalPlayer track={track} onToggleFavorite={onToggleFavorite} />;
   }
 
+  const { currentTime, duration, playing, isBuffering, rate, shuffle, repeat } = playback;
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const active = playback.current ?? track;
+
   const cycleRate = () => {
-    const rates = [0.5, 1, 1.25, 1.5, 2];
-    const next = rates[(rates.indexOf(rate) + 1) % rates.length];
-    setRate(next);
-    player.setPlaybackRate(next);
+    const position = PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]);
+    playback.setRate(PLAYBACK_RATES[(position + 1) % PLAYBACK_RATES.length]);
   };
 
   return (
     <LinearGradient colors={Gradients.card} style={styles.card}>
-      <View style={styles.topSignal}><View style={styles.signalPurple} /><View style={styles.signalBlue} /><View style={styles.signalCyan} /></View>
+      <View style={styles.topSignal}>
+        <View style={styles.signalPurple} /><View style={styles.signalBlue} /><View style={styles.signalCyan} />
+      </View>
+
       <View style={styles.topRow}>
         <View style={styles.coverWrap}>
-          <Image source={require('@/assets/brand/voxa-app-icon.png')} style={styles.cover} />
+          <Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.cover} />
         </View>
         <View style={styles.meta}>
           <View style={styles.liveRow}>
-            <View style={styles.liveDot} />
-            <Text style={styles.eyebrow}>{track ? 'NOW PLAYING' : 'PRÊT À LIRE'}</Text>
+            <View style={[styles.liveDot, playing && styles.liveDotOn]} />
+            <Text style={styles.eyebrow}>
+              {isBuffering ? 'CHARGEMENT' : playing ? 'NOW PLAYING' : active ? 'EN PAUSE' : 'PRÊT À LIRE'}
+            </Text>
           </View>
-          <Text style={styles.title} numberOfLines={1}>{track?.title ?? 'Importe ton premier master'}</Text>
-          <Text style={styles.artist} numberOfLines={1}>{track?.artist ?? 'Audio & vidéo propriétaire'}</Text>
+          <Text style={styles.title} numberOfLines={1}>{active?.title ?? 'Importe ton premier master'}</Text>
+          <Text style={styles.artist} numberOfLines={1}>{active?.artist ?? 'Audio & vidéo propriétaire'}</Text>
         </View>
-        <Pressable disabled={!track} onPress={() => track && onToggleFavorite(track.id)} style={styles.iconButton}>
-          <Ionicons name={track?.favorite ? 'heart' : 'heart-outline'} size={22} color={track?.favorite ? Colors.purple : Colors.textMuted} />
+        <Pressable
+          disabled={!active}
+          accessibilityLabel={active?.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+          onPress={() => active && onToggleFavorite(active.id)}
+          style={styles.iconButton}>
+          <Ionicons
+            name={active?.favorite ? 'heart' : 'heart-outline'}
+            size={22}
+            color={active?.favorite ? Colors.purple : Colors.textMuted}
+          />
         </Pressable>
       </View>
 
       <Waveform progress={progress} />
       <Slider
-        value={status.currentTime}
+        value={currentTime}
         minimumValue={0}
-        maximumValue={Math.max(status.duration, 1)}
-        onSlidingComplete={(value) => player.seekTo(value)}
+        maximumValue={Math.max(duration, 1)}
+        onSlidingComplete={playback.seekTo}
         minimumTrackTintColor={Colors.cyan}
         maximumTrackTintColor="transparent"
         thumbTintColor={Colors.text}
         style={styles.slider}
       />
       <View style={styles.timeRow}>
-        <Text style={styles.time}>{formatTime(status.currentTime)}</Text>
-        <Text style={styles.quality}>{track?.kind === 'video' ? 'VIDEO · AUDIO MODE' : 'LOCAL · ORIGINAL'}</Text>
-        <Text style={styles.time}>{formatTime(status.duration)}</Text>
+        <Text style={styles.time}>{formatTime(currentTime)}</Text>
+        <Text style={styles.quality}>
+          {active?.kind === 'video' ? 'VIDEO · AUDIO MODE' : 'LOCAL · ORIGINAL'}
+          {playback.queue.length > 1 ? ` · ${playback.index + 1}/${playback.queue.length}` : ''}
+        </Text>
+        <Text style={styles.time}>{formatTime(duration)}</Text>
       </View>
 
       <View style={styles.controls}>
-        <Pressable onPress={cycleRate} style={styles.rateButton}><Text style={styles.rateText}>{rate}×</Text></Pressable>
-        <Pressable disabled={!track} onPress={() => player.seekTo(Math.max(status.currentTime - 15, 0))} style={styles.iconButton}>
-          <Ionicons name="play-back" size={25} color={Colors.text} />
+        <Pressable
+          accessibilityLabel="Lecture aléatoire"
+          accessibilityState={{ selected: shuffle }}
+          onPress={playback.toggleShuffle}
+          style={styles.iconButton}>
+          <Ionicons name="shuffle" size={21} color={shuffle ? Colors.cyan : Colors.textMuted} />
         </Pressable>
-        <Pressable onPress={togglePlay} style={styles.playButton}>
+        <Pressable
+          disabled={!playback.hasPrevious && !active}
+          accessibilityLabel="Titre précédent"
+          onPress={playback.previous}
+          style={styles.iconButton}>
+          <Ionicons name="play-skip-back" size={23} color={Colors.text} />
+        </Pressable>
+        <Pressable
+          accessibilityLabel={playing ? 'Pause' : 'Lecture'}
+          onPress={() => (active ? playback.toggle() : onImport())}
+          style={styles.playButton}>
           <LinearGradient colors={Gradients.brand} style={styles.playGradient}>
-            <Ionicons name={status.playing ? 'pause' : 'play'} size={29} color={Colors.text} />
+            <Ionicons name={playing ? 'pause' : 'play'} size={29} color={Colors.text} />
           </LinearGradient>
         </Pressable>
-        <Pressable disabled={!track} onPress={() => player.seekTo(Math.min(status.currentTime + 15, status.duration || 0))} style={styles.iconButton}>
-          <Ionicons name="play-forward" size={25} color={Colors.text} />
+        <Pressable
+          disabled={!playback.hasNext}
+          accessibilityLabel="Titre suivant"
+          onPress={playback.next}
+          style={styles.iconButton}>
+          <Ionicons name="play-skip-forward" size={23} color={playback.hasNext ? Colors.text : Colors.textMuted} />
         </Pressable>
-        <Pressable onPress={onImport} style={styles.iconButton}><Ionicons name="add" size={26} color={Colors.cyan} /></Pressable>
+        <Pressable
+          accessibilityLabel={`Répétition : ${repeat}`}
+          accessibilityState={{ selected: repeat !== 'none' }}
+          onPress={playback.cycleRepeat}
+          style={styles.iconButton}>
+          <Ionicons name={REPEAT_ICON[repeat]} size={21} color={repeat === 'none' ? Colors.textMuted : Colors.cyan} />
+          {repeat === 'one' ? <View style={styles.repeatOneDot} /> : null}
+        </Pressable>
+      </View>
+
+      <View style={styles.secondaryRow}>
+        <Pressable accessibilityLabel="Reculer de 15 secondes" onPress={() => playback.seekBy(-15)} style={styles.pill}>
+          <Ionicons name="play-back" size={15} color={Colors.text} />
+          <Text style={styles.pillText}>15</Text>
+        </Pressable>
+        <Pressable accessibilityLabel={`Vitesse ${rate}×`} onPress={cycleRate} style={styles.pill}>
+          <Ionicons name="speedometer-outline" size={15} color={Colors.cyan} />
+          <Text style={styles.pillText}>{rate}×</Text>
+        </Pressable>
+        <Pressable accessibilityLabel="Avancer de 15 secondes" onPress={() => playback.seekBy(15)} style={styles.pill}>
+          <Text style={styles.pillText}>15</Text>
+          <Ionicons name="play-forward" size={15} color={Colors.text} />
+        </Pressable>
+        <Pressable accessibilityLabel="Importer des fichiers" onPress={onImport} style={styles.pill}>
+          <Ionicons name="add" size={16} color={Colors.cyan} />
+          <Text style={styles.pillText}>Importer</Text>
+        </Pressable>
       </View>
     </LinearGradient>
   );
@@ -132,7 +171,8 @@ const styles = StyleSheet.create({
   cover: { width: '100%', height: '100%' },
   meta: { flex: 1, gap: 4 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.cyan },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textMuted },
+  liveDotOn: { backgroundColor: Colors.cyan },
   eyebrow: { color: Colors.cyan, fontWeight: '800', fontSize: 10, letterSpacing: 1.5 },
   title: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   artist: { color: Colors.textMuted, fontSize: 13 },
@@ -144,6 +184,8 @@ const styles = StyleSheet.create({
   controls: { marginTop: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   playButton: { borderRadius: 32, shadowColor: Colors.purple, shadowOpacity: 0.5, shadowRadius: 18, shadowOffset: { width: 0, height: 7 } },
   playGradient: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
-  rateButton: { minWidth: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  rateText: { color: Colors.text, fontWeight: '800', fontSize: 13 },
+  repeatOneDot: { position: 'absolute', bottom: 8, width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.cyan },
+  secondaryRow: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  pill: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: '#283149', backgroundColor: '#0B0F18' },
+  pillText: { color: Colors.text, fontWeight: '800', fontSize: 11 },
 });

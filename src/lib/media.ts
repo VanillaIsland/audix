@@ -3,15 +3,15 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import type { MediaKind, VoxaPlaylist, VoxaTrack } from '@/types/media';
+import type { MediaKind, AudixPlaylist, AudixTrack } from '@/types/media';
 
-const LIBRARY_KEY = 'voxa.library.v1';
-const PLAYLISTS_KEY = 'voxa.playlists.v1';
+const LIBRARY_KEY = 'audix.library.v1';
+const PLAYLISTS_KEY = 'audix.playlists.v1';
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'aac', 'alac', 'ogg', 'opus', 'm4a', 'aiff', 'aif'];
 const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm', 'mkv'];
 
 type LinkProfile = {
-  origin: VoxaTrack['origin'];
+  origin: AudixTrack['origin'];
   label: string;
 };
 
@@ -39,25 +39,25 @@ export function isSupportedMedia(name: string, mimeType?: string): MediaKind | n
   return null;
 }
 
-export async function loadLibrary(): Promise<VoxaTrack[]> {
+export async function loadLibrary(): Promise<AudixTrack[]> {
   const raw = await AsyncStorage.getItem(LIBRARY_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as VoxaTrack[];
+    return JSON.parse(raw) as AudixTrack[];
   } catch {
     return [];
   }
 }
 
-export async function saveLibrary(tracks: VoxaTrack[]) {
+export async function saveLibrary(tracks: AudixTrack[]) {
   await AsyncStorage.setItem(LIBRARY_KEY, JSON.stringify(tracks));
 }
 
-export async function loadPlaylists(): Promise<VoxaPlaylist[]> {
+export async function loadPlaylists(): Promise<AudixPlaylist[]> {
   const raw = await AsyncStorage.getItem(PLAYLISTS_KEY);
   if (!raw) return [];
   try {
-    const parsed = JSON.parse(raw) as Partial<VoxaPlaylist>[];
+    const parsed = JSON.parse(raw) as Partial<AudixPlaylist>[];
     return parsed.map((playlist, index) => ({
       id: playlist.id ?? `${Date.now()}-${index}`,
       name: playlist.name ?? 'Playlist sans titre',
@@ -72,7 +72,7 @@ export async function loadPlaylists(): Promise<VoxaPlaylist[]> {
   }
 }
 
-export async function savePlaylists(playlists: VoxaPlaylist[]) {
+export async function savePlaylists(playlists: AudixPlaylist[]) {
   await AsyncStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
 }
 
@@ -86,7 +86,7 @@ function titleFromName(name: string) {
 
 async function persistAsset(asset: DocumentPicker.DocumentPickerAsset, id: string) {
   if (Platform.OS === 'web') return asset.uri;
-  const directory = new Directory(Paths.document, 'voxa-library');
+  const directory = new Directory(Paths.document, 'audix-library');
   directory.create({ idempotent: true, intermediates: true });
   const destination = new File(directory, `${id}-${safeName(asset.name)}`);
   const source = new File(asset.uri);
@@ -94,7 +94,7 @@ async function persistAsset(asset: DocumentPicker.DocumentPickerAsset, id: strin
   return destination.uri;
 }
 
-export async function pickOwnedMedia(): Promise<VoxaTrack[]> {
+export async function pickOwnedMedia(): Promise<AudixTrack[]> {
   const result = await DocumentPicker.getDocumentAsync({
     type: ['audio/*', 'video/*'],
     copyToCacheDirectory: true,
@@ -103,7 +103,7 @@ export async function pickOwnedMedia(): Promise<VoxaTrack[]> {
 
   if (result.canceled) return [];
 
-  const imported: VoxaTrack[] = [];
+  const imported: AudixTrack[] = [];
   for (const asset of result.assets) {
     const kind = isSupportedMedia(asset.name, asset.mimeType);
     if (!kind) continue;
@@ -128,7 +128,7 @@ export async function pickOwnedMedia(): Promise<VoxaTrack[]> {
   return imported;
 }
 
-export async function importAuthorizedUrl(url: string, keepOffline: boolean): Promise<VoxaTrack> {
+export async function importAuthorizedUrl(url: string, keepOffline: boolean): Promise<AudixTrack> {
   const parsed = new URL(url);
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Seuls les liens HTTP(S) sont acceptés.');
 
@@ -164,7 +164,7 @@ export async function importAuthorizedUrl(url: string, keepOffline: boolean): Pr
       response = await fetch(url, { method: 'HEAD' });
       if (response.ok) mimeType = response.headers.get('content-type')?.split(';')[0] ?? '';
     } catch {
-      throw new Error('Le serveur ne permet pas à Voxa de vérifier ce lien. Utilise une URL directe terminant par .mp3, .wav, .flac, .m4a, .mp4 ou un autre format accepté.');
+      throw new Error('Le serveur ne permet pas à Audix de vérifier ce lien. Utilise une URL directe terminant par .mp3, .wav, .flac, .m4a, .mp4 ou un autre format accepté.');
     }
   }
   const kind = kindFromPath ?? isSupportedMedia(parsed.pathname, mimeType);
@@ -175,7 +175,7 @@ export async function importAuthorizedUrl(url: string, keepOffline: boolean): Pr
   let uri = url;
   if (keepOffline) {
     if (Platform.OS === 'web') throw new Error('Le stockage hors ligne est disponible dans l’app iOS/Android.');
-    const directory = new Directory(Paths.document, 'voxa-library');
+    const directory = new Directory(Paths.document, 'audix-library');
     directory.create({ idempotent: true, intermediates: true });
     const extension = extensionOf(parsed.pathname) || (kind === 'audio' ? 'm4a' : 'mp4');
     const destination = new File(directory, `${id}.${extension}`);

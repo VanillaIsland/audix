@@ -5,7 +5,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, T
 
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { describeLink } from '@/lib/media';
-import type { VoxaPlaylist } from '@/types/media';
+import type { AudixPlaylist } from '@/types/media';
 
 type Props = {
   url: string;
@@ -13,7 +13,7 @@ type Props = {
   rightsConfirmed: boolean;
   onChangeRights: (value: boolean) => void;
   busy: boolean;
-  playlists: VoxaPlaylist[];
+  playlists: AudixPlaylist[];
   targetPlaylistId: string | null;
   onChangeTargetPlaylist: (id: string | null) => void;
   onSubmit: (keepOffline: boolean) => void;
@@ -47,7 +47,7 @@ export function GrabPanel({
         </View>
         <View style={styles.heroCopy}>
           <View style={styles.eyebrowRow}>
-            <Text style={styles.eyebrow}>VOXA INGEST ENGINE</Text>
+            <Text style={styles.eyebrow}>AUDIX INGEST ENGINE</Text>
             <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>READY</Text></View>
           </View>
           <Text style={styles.title}>Grab your catalog</Text>
@@ -82,7 +82,7 @@ export function GrabPanel({
       <View style={styles.routeGrid}>
         <View style={styles.routeCard}>
           <Text style={styles.routeLabel}>DESTINATION</Text>
-          <Text style={styles.routeTitle}>Bibliothèque Voxa</Text>
+          <Text style={styles.routeTitle}>Bibliothèque Audix</Text>
           <Text style={styles.routeCopy}>Le lien est ajouté à ton catalogue local. Tu peux aussi l’envoyer directement dans une playlist.</Text>
           {playlists.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playlistChips}>
@@ -104,8 +104,8 @@ export function GrabPanel({
           <Text style={styles.routeTitle}>{url.trim() ? profile.label : 'En attente d’un lien'}</Text>
           <Text style={styles.routeCopy}>
             {isPlatform
-              ? 'Voxa enregistre cette page comme référence de ton catalogue et l’ouvre via le lecteur officiel.'
-              : 'Un fichier direct audio/vidéo peut être lu dans Voxa. Le hors-ligne est réservé aux builds mobiles.'}
+              ? 'Audix enregistre cette page comme référence de ton catalogue et l’ouvre via le lecteur officiel.'
+              : 'Un fichier direct audio/vidéo peut être lu dans Audix. Le hors-ligne est réservé aux builds mobiles.'}
           </Text>
           {isPlatform && url.trim() ? (
             <Pressable style={styles.sourceLink} onPress={() => Linking.openURL(url.trim())}>
@@ -128,7 +128,7 @@ export function GrabPanel({
         </View>
         <View style={styles.rightsCopy}>
           <Text style={styles.rightsTitle}>Catalogue autorisé</Text>
-          <Text style={styles.rightsText}>Je confirme posséder les droits ou l’autorisation d’utiliser cette source dans Voxa.</Text>
+          <Text style={styles.rightsText}>Je confirme posséder les droits ou l’autorisation d’utiliser cette source dans Audix.</Text>
         </View>
         <Ionicons name={rightsConfirmed ? 'shield-checkmark' : 'shield-outline'} size={22} color={rightsConfirmed ? Colors.success : Colors.textMuted} />
       </Pressable>
@@ -150,7 +150,7 @@ export function GrabPanel({
 
       <View style={styles.policyBar}>
         <Ionicons name="information-circle-outline" size={18} color={Colors.success} />
-        <Text style={styles.policyText}>Les plateformes restent des références officielles. Voxa ne contourne ni publicité, ni DRM, ni contrôle d’accès.</Text>
+        <Text style={styles.policyText}>Les plateformes restent des références officielles. Audix ne contourne ni publicité, ni DRM, ni contrôle d’accès.</Text>
       </View>
     </View>
   );

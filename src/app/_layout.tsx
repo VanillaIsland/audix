@@ -1,26 +1,18 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
-import { setAudioModeAsync } from 'expo-audio';
+
+import { PlaybackProvider } from '@/lib/playback';
 
 import '../global.css';
 
 export default function RootLayout() {
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
-    }).catch(() => undefined);
-  }, []);
-
   return (
-    <>
+    // PlaybackProvider sits above the navigator so the audio player is never
+    // unmounted by navigation — that is what keeps sound alive when the screen
+    // locks or the user switches app.
+    <PlaybackProvider>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#050609' } }} />
-    </>
+    </PlaybackProvider>
   );
 }

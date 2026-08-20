@@ -4,21 +4,21 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Colors, Gradients, Radius } from '@/constants/theme';
-import type { VoxaPlaylist, VoxaTrack } from '@/types/media';
+import type { AudixPlaylist, AudixTrack } from '@/types/media';
 
 const PALETTE = ['#A71BFF', '#6C32FF', '#246BFF', '#00D8E8', '#39E6A2', '#FFBE5C', '#FF5F7A'];
 
 type Props = {
-  playlists: VoxaPlaylist[];
-  tracks: VoxaTrack[];
+  playlists: AudixPlaylist[];
+  tracks: AudixTrack[];
   currentId: string | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onCreate: (name: string, color: string) => VoxaPlaylist;
-  onUpdate: (id: string, changes: Partial<Pick<VoxaPlaylist, 'name' | 'description' | 'color'>>) => void;
+  onCreate: (name: string, color: string) => AudixPlaylist;
+  onUpdate: (id: string, changes: Partial<Pick<AudixPlaylist, 'name' | 'description' | 'color'>>) => void;
   onToggleTrack: (playlistId: string, trackId: string) => void;
   onPlay: (trackId: string) => void;
-  onRequestDelete: (playlist: VoxaPlaylist) => void;
+  onRequestDelete: (playlist: AudixPlaylist) => void;
   onImport: () => void;
   onGrab: () => void;
 };
