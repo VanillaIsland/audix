@@ -1,56 +1,76 @@
-# Welcome to your Expo app 👋
+# VOXA — Smart Audio Player
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Voxa est un lecteur local-first pour catalogues audio/vidéo propriétaires. Le même projet Expo cible iOS, Android et une preview web.
 
-## Get started
+## MVP 0.1
 
-1. Install dependencies
+- lecture audio locale et audio-only depuis un fichier vidéo compatible ;
+- lecture en arrière-plan et contrôles écran verrouillé sur les builds natifs ;
+- import de MP3, WAV, FLAC, AAC, ALAC, OGG, OPUS, M4A, AIFF, MP4, MOV, WebM et MKV ;
+- bibliothèque privée persistée sur l’appareil ;
+- création de playlists personnelles avec ajout et retrait de titres ;
+- historique, favoris, téléchargements et recherche ;
+- Grab de liens directs HTTP(S) après validation du type MIME et attestation de droits ;
+- schéma Supabase avec Row Level Security pour la future synchronisation privée ;
+- preview web statique déployable sur Netlify.
 
-   ```bash
-   npm install
-   ```
+## Limites volontaires
 
-2. Start the app
+Voxa n’intègre aucun bloqueur publicitaire, contournement de DRM ou extracteur tiers pour YouTube, Spotify ou Facebook. Les masters doivent être importés depuis les fichiers originaux, un export officiel (YouTube Studio/Google Takeout, export Meta) ou un stockage direct autorisé. Spotify peut servir de référence de catalogue via son API officielle, mais pas de source de fichiers audio.
 
-   ```bash
-   npx expo start
-   ```
+## Démarrer
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Prérequis : Node.js 22.13+.
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env.local
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Variables publiques attendues :
 
-### Other setup steps
+```text
+EXPO_PUBLIC_SUPABASE_URL
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Ne jamais placer de clé `service_role` ou `sb_secret_...` dans l’application.
 
-## Learn more
+## Vérifier
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run typecheck
+npm run lint
+npm run build:web
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Architecture cible
 
-## Join the community
+1. **PLAY** — player natif, queue, gapless, crossfade, vitesse et contrôles système.
+2. **LIBRARY** — catalogue local-first, métadonnées, favoris, historique et smart playlists.
+3. **WAVE** — waveform, marqueurs, silences, BPM et tonalité.
+4. **TOOLS** — conversion et édition par lots dans un module natif/desktop dédié.
+5. **AI** — transcription, tags et recherche naturelle sur traitements opt-in.
 
-Join our community of developers creating universal apps.
+Netlify héberge uniquement la preview web. Les versions iOS/Android seront générées avec EAS Build puis distribuées via TestFlight et Google Play Internal Testing.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Envoyer sur TestFlight
+
+Prérequis : un compte Expo et une adhésion Apple Developer active. Depuis ce dossier :
+
+```bash
+npx eas-cli login
+npx testflight
+```
+
+Le second script configure les certificats, crée un build iOS de production et l’envoie dans App Store Connect. Après le traitement Apple, ouvre **App Store Connect → Voxa → TestFlight**, complète les informations de test et ajoute les testeurs internes.
+
+Pour séparer les étapes :
+
+```bash
+npm run build:ios:testflight
+npm run submit:ios:testflight
+```
+
+Le bundle iOS réservé est `com.vanillaisland.voxa`. Un identifiant différent exige une modification de `app.json` avant le premier envoi.

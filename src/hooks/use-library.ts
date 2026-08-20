@@ -1,0 +1,114 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import {
+  importAuthorizedUrl,
+  loadLibrary,
+  loadPlaylists,
+  pickOwnedMedia,
+  saveLibrary,
+  savePlaylists,
+} from '@/lib/media';
+import type { VoxaPlaylist, VoxaTrack } from '@/types/media';
+
+export function useLibrary() {
+  const [tracks, setTracks] = useState<VoxaTrack[]>([]);
+  const [playlists, setPlaylists] = useState<VoxaPlaylist[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    Promise.all([loadLibrary(), loadPlaylists()]).then(([savedTracks, savedPlaylists]) => {
+      setTracks(savedTracks);
+      setPlaylists(savedPlaylists);
+      setCurrentId(savedTracks[0]?.id ?? null);
+      setReady(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (ready) saveLibrary(tracks).catch(() => undefined);
+  }, [ready, tracks]);
+
+  useEffect(() => {
+    if (ready) savePlaylists(playlists).catch(() => undefined);
+  }, [playlists, ready]);
+
+  const current = useMemo(() => tracks.find((track) => track.id === currentId) ?? null, [currentId, tracks]);
+
+  const importFiles = useCallback(async () => {
+    const imported = await pickOwnedMedia();
+    if (!imported.length) return 0;
+    setTracks((existing) => [...imported, ...existing]);
+    setCurrentId((value) => value ?? imported[0].id);
+    return imported.length;
+  }, []);
+
+  const importUrl = useCallback(async (url: string, keepOffline: boolean) => {
+    const imported = await importAuthorizedUrl(url, keepOffline);
+    setTracks((existing) => [imported, ...existing]);
+    setCurrentId(imported.id);
+    return imported;
+  }, []);
+
+  const toggleFavorite = useCallback((id: string) => {
+    setTracks((existing) => existing.map((track) => (track.id === id ? { ...track, favorite: !track.favorite } : track)));
+  }, []);
+
+  const markPlayed = useCallback((id: string) => {
+    const now = new Date().toISOString();
+    setTracks((existing) =>
+      existing.map((track) =>
+        track.id === id ? { ...track, lastPlayedAt: now, playCount: track.playCount + 1 } : track,
+      ),
+    );
+  }, []);
+
+  const createPlaylist = useCallback((name: string) => {
+    const normalized = name.trim();
+    if (!normalized) throw new Error('Donne un nom à la playlist.');
+    if (playlists.some((playlist) => playlist.name.toLowerCase() === normalized.toLowerCase())) {
+      throw new Error('Une playlist porte déjà ce nom.');
+    }
+    const playlist: VoxaPlaylist = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name: normalized,
+      trackIds: [],
+      createdAt: new Date().toISOString(),
+    };
+    setPlaylists((existing) => [playlist, ...existing]);
+    return playlist;
+  }, [playlists]);
+
+  const toggleTrackInPlaylist = useCallback((playlistId: string, trackId: string) => {
+    setPlaylists((existing) => existing.map((playlist) => {
+      if (playlist.id !== playlistId) return playlist;
+      const hasTrack = playlist.trackIds.includes(trackId);
+      return {
+        ...playlist,
+        trackIds: hasTrack
+          ? playlist.trackIds.filter((id) => id !== trackId)
+          : [...playlist.trackIds, trackId],
+      };
+    }));
+  }, []);
+
+  const deletePlaylist = useCallback((playlistId: string) => {
+    setPlaylists((existing) => existing.filter((playlist) => playlist.id !== playlistId));
+  }, []);
+
+  return {
+    tracks,
+    playlists,
+    current,
+    currentId,
+    setCurrentId,
+    importFiles,
+    importUrl,
+    toggleFavorite,
+    markPlayed,
+    createPlaylist,
+    toggleTrackInPlaylist,
+    deletePlaylist,
+    ready,
+  };
+}
