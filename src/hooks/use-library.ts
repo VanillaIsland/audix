@@ -63,7 +63,7 @@ export function useLibrary() {
     );
   }, []);
 
-  const createPlaylist = useCallback((name: string) => {
+  const createPlaylist = useCallback((name: string, color = '#6C32FF') => {
     const normalized = name.trim();
     if (!normalized) throw new Error('Donne un nom à la playlist.');
     if (playlists.some((playlist) => playlist.name.toLowerCase() === normalized.toLowerCase())) {
@@ -72,12 +72,23 @@ export function useLibrary() {
     const playlist: VoxaPlaylist = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: normalized,
+      description: 'Sélection personnelle',
+      color,
       trackIds: [],
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     setPlaylists((existing) => [playlist, ...existing]);
     return playlist;
   }, [playlists]);
+
+  const updatePlaylist = useCallback((playlistId: string, changes: Partial<Pick<VoxaPlaylist, 'name' | 'description' | 'color'>>) => {
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.id === playlistId
+        ? { ...playlist, ...changes, name: changes.name?.slice(0, 80) ?? playlist.name, updatedAt: new Date().toISOString() }
+        : playlist
+    )));
+  }, []);
 
   const toggleTrackInPlaylist = useCallback((playlistId: string, trackId: string) => {
     setPlaylists((existing) => existing.map((playlist) => {
@@ -88,8 +99,17 @@ export function useLibrary() {
         trackIds: hasTrack
           ? playlist.trackIds.filter((id) => id !== trackId)
           : [...playlist.trackIds, trackId],
+        updatedAt: new Date().toISOString(),
       };
     }));
+  }, []);
+
+  const addTrackToPlaylist = useCallback((playlistId: string, trackId: string) => {
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.id === playlistId && !playlist.trackIds.includes(trackId)
+        ? { ...playlist, trackIds: [...playlist.trackIds, trackId], updatedAt: new Date().toISOString() }
+        : playlist
+    )));
   }, []);
 
   const deletePlaylist = useCallback((playlistId: string) => {
@@ -107,7 +127,9 @@ export function useLibrary() {
     toggleFavorite,
     markPlayed,
     createPlaylist,
+    updatePlaylist,
     toggleTrackInPlaylist,
+    addTrackToPlaylist,
     deletePlaylist,
     ready,
   };

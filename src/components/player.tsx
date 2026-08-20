@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Waveform } from '@/components/waveform';
-import { Colors, Gradients, Radius } from '@/constants/theme';
+import { ExternalPlayer } from '@/components/external-player';
+import { Colors, Gradients } from '@/constants/theme';
 import type { VoxaTrack } from '@/types/media';
 
 const formatTime = (seconds: number) => {
@@ -30,7 +31,7 @@ export function Player({ track, onImport, onPlayed, onToggleFavorite }: Props) {
 
   useEffect(() => {
     player.pause();
-    if (!track) return;
+    if (!track || track.externalUrl) return;
     player.replace(track.uri);
     if (Platform.OS !== 'web') {
       player.setActiveForLockScreen(true, {
@@ -53,6 +54,10 @@ export function Player({ track, onImport, onPlayed, onToggleFavorite }: Props) {
     player.play();
   };
 
+  if (track?.externalUrl) {
+    return <ExternalPlayer track={track} onToggleFavorite={onToggleFavorite} />;
+  }
+
   const cycleRate = () => {
     const rates = [0.5, 1, 1.25, 1.5, 2];
     const next = rates[(rates.indexOf(rate) + 1) % rates.length];
@@ -62,6 +67,7 @@ export function Player({ track, onImport, onPlayed, onToggleFavorite }: Props) {
 
   return (
     <LinearGradient colors={Gradients.card} style={styles.card}>
+      <View style={styles.topSignal}><View style={styles.signalPurple} /><View style={styles.signalBlue} /><View style={styles.signalCyan} /></View>
       <View style={styles.topRow}>
         <View style={styles.coverWrap}>
           <Image source={require('@/assets/brand/voxa-app-icon.png')} style={styles.cover} />
@@ -116,7 +122,11 @@ export function Player({ track, onImport, onPlayed, onToggleFavorite }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.large, padding: 20, overflow: 'hidden' },
+  card: { position: 'relative', borderWidth: 1, borderColor: '#2A3248', borderRadius: 30, padding: 22, overflow: 'hidden' },
+  topSignal: { position: 'absolute', top: 0, left: 24, right: 24, height: 2, flexDirection: 'row' },
+  signalPurple: { flex: 1, backgroundColor: Colors.purple },
+  signalBlue: { flex: 1, backgroundColor: Colors.blue },
+  signalCyan: { flex: 1, backgroundColor: Colors.cyan },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   coverWrap: { width: 64, height: 64, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#343A50' },
   cover: { width: '100%', height: '100%' },

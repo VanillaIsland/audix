@@ -23,11 +23,15 @@ export type VoxaTrack = {
   lastPlayedAt?: string;
   playCount: number;
   size?: number;
+  externalUrl?: string;
 };
 
 export type VoxaPlaylist = {
   id: string;
   name: string;
+  description: string;
+  color: string;
   trackIds: string[];
   createdAt: string;
+  updatedAt: string;
 };

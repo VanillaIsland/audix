@@ -10,6 +10,26 @@ const PLAYLISTS_KEY = 'voxa.playlists.v1';
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'aac', 'alac', 'ogg', 'opus', 'm4a', 'aiff', 'aif'];
 const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm', 'mkv'];
 
+type LinkProfile = {
+  origin: VoxaTrack['origin'];
+  label: string;
+};
+
+const PLATFORM_HOSTS: { match: (host: string) => boolean; profile: LinkProfile }[] = [
+  {
+    match: (host) => host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'youtube.com',
+    profile: { origin: 'youtube-export', label: 'YouTube · Référence catalogue' },
+  },
+  {
+    match: (host) => host.endsWith('.spotify.com') || host === 'spotify.com' || host === 'open.spotify.com',
+    profile: { origin: 'spotify-catalog', label: 'Spotify · Référence catalogue' },
+  },
+  {
+    match: (host) => host.endsWith('.facebook.com') || host === 'facebook.com' || host === 'fb.watch',
+    profile: { origin: 'facebook-export', label: 'Facebook · Référence catalogue' },
+  },
+];
+
 const extensionOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? '';
 
 export function isSupportedMedia(name: string, mimeType?: string): MediaKind | null {
@@ -37,7 +57,16 @@ export async function loadPlaylists(): Promise<VoxaPlaylist[]> {
   const raw = await AsyncStorage.getItem(PLAYLISTS_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as VoxaPlaylist[];
+    const parsed = JSON.parse(raw) as Partial<VoxaPlaylist>[];
+    return parsed.map((playlist, index) => ({
+      id: playlist.id ?? `${Date.now()}-${index}`,
+      name: playlist.name ?? 'Playlist sans titre',
+      description: playlist.description ?? 'Sélection personnelle',
+      color: playlist.color ?? '#6C32FF',
+      trackIds: playlist.trackIds ?? [],
+      createdAt: playlist.createdAt ?? new Date().toISOString(),
+      updatedAt: playlist.updatedAt ?? playlist.createdAt ?? new Date().toISOString(),
+    }));
   } catch {
     return [];
   }
@@ -103,11 +132,44 @@ export async function importAuthorizedUrl(url: string, keepOffline: boolean): Pr
   const parsed = new URL(url);
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Seuls les liens HTTP(S) sont acceptés.');
 
-  const response = await fetch(url, { method: 'HEAD' });
-  if (!response.ok) throw new Error(`Le serveur a refusé la vérification (${response.status}).`);
-  const mimeType = response.headers.get('content-type')?.split(';')[0] ?? '';
-  const kind = isSupportedMedia(parsed.pathname, mimeType);
-  if (!kind) throw new Error('Voxa accepte uniquement un fichier audio ou vidéo direct.');
+  const host = parsed.hostname.toLowerCase();
+  const platform = PLATFORM_HOSTS.find((entry) => entry.match(host));
+  if (platform) {
+    if (keepOffline) {
+      throw new Error('Cette plateforme ne fournit pas un fichier direct téléchargeable. Ajoute-la comme référence, puis importe ton master ou ton export officiel pour le mode hors ligne.');
+    }
+
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      title: platform.profile.label,
+      artist: host.replace(/^www\./, ''),
+      uri: url,
+      externalUrl: url,
+      mimeType: 'text/html',
+      kind: 'audio',
+      origin: platform.profile.origin,
+      downloaded: false,
+      favorite: false,
+      rightsConfirmed: true,
+      addedAt: new Date().toISOString(),
+      playCount: 0,
+    };
+  }
+
+  const kindFromPath = isSupportedMedia(parsed.pathname);
+  let response: Response | null = null;
+  let mimeType = '';
+  if (!kindFromPath) {
+    try {
+      response = await fetch(url, { method: 'HEAD' });
+      if (response.ok) mimeType = response.headers.get('content-type')?.split(';')[0] ?? '';
+    } catch {
+      throw new Error('Le serveur ne permet pas à Voxa de vérifier ce lien. Utilise une URL directe terminant par .mp3, .wav, .flac, .m4a, .mp4 ou un autre format accepté.');
+    }
+  }
+  const kind = kindFromPath ?? isSupportedMedia(parsed.pathname, mimeType);
+  if (!kind) throw new Error('Ce lien ne pointe pas vers un fichier audio ou vidéo direct.');
+  if (!mimeType) mimeType = `${kind}/${extensionOf(parsed.pathname) || 'unknown'}`;
 
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   let uri = url;
@@ -133,6 +195,19 @@ export async function importAuthorizedUrl(url: string, keepOffline: boolean): Pr
     rightsConfirmed: true,
     addedAt: new Date().toISOString(),
     playCount: 0,
-    size: Number(response.headers.get('content-length')) || undefined,
+    size: Number(response?.headers.get('content-length')) || undefined,
   };
+}
+
+export function describeLink(url: string) {
+  try {
+    const parsed = new URL(url);
+    const platform = PLATFORM_HOSTS.find((entry) => entry.match(parsed.hostname.toLowerCase()));
+    if (platform) return { type: 'platform' as const, label: platform.profile.label, origin: platform.profile.origin };
+    const kind = isSupportedMedia(parsed.pathname);
+    if (kind) return { type: 'direct' as const, label: `${kind === 'audio' ? 'Audio' : 'Vidéo'} direct`, origin: 'direct' as const };
+    return { type: 'unknown' as const, label: 'Lien à analyser', origin: 'direct' as const };
+  } catch {
+    return { type: 'invalid' as const, label: 'URL invalide', origin: 'direct' as const };
+  }
 }
