@@ -15,6 +15,7 @@ import {
   setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
+  type AudioPlayer,
 } from 'expo-audio';
 
 import type { AudixTrack } from '@/types/media';
@@ -22,9 +23,12 @@ import type { AudixTrack } from '@/types/media';
 export type RepeatMode = 'none' | 'one' | 'all';
 
 export const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
+export const CROSSFADE_CHOICES = [0, 2, 4, 6, 8, 12] as const;
 
-/** Below this position, "previous" restarts the track instead of going back one. */
+const SEEK_STEP = 15;
 const RESTART_THRESHOLD = 3;
+/** Volume ramp resolution. 50ms is inaudible as steps but cheap enough. */
+const FADE_TICK_MS = 50;
 
 type PlaybackValue = {
   current: AudixTrack | null;
@@ -38,9 +42,12 @@ type PlaybackValue = {
   rate: number;
   shuffle: boolean;
   repeat: RepeatMode;
+  /** Crossfade length in seconds. 0 disables it entirely. */
+  crossfade: number;
+  /** Master gain, 0..1. Per-track normalisation multiplies into this. */
+  volume: number;
   hasNext: boolean;
   hasPrevious: boolean;
-  /** Load a track and (optionally) the queue it belongs to, then start playing. */
   playTrack: (track: AudixTrack, queue?: AudixTrack[]) => void;
   toggle: () => void;
   play: () => void;
@@ -50,16 +57,17 @@ type PlaybackValue = {
   seekTo: (seconds: number) => void;
   seekBy: (delta: number) => void;
   setRate: (rate: number) => void;
+  setCrossfade: (seconds: number) => void;
+  setVolume: (value: number) => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
   stop: () => void;
-  /** Register a callback fired once per track when playback actually starts. */
   onTrackStart: (handler: (track: AudixTrack) => void) => void;
 };
 
 const PlaybackContext = createContext<PlaybackValue | null>(null);
 
-const isPlayable = (track: AudixTrack | null): track is AudixTrack =>
+const isPlayable = (track: AudixTrack | null | undefined): track is AudixTrack =>
   Boolean(track && !track.externalUrl && track.uri);
 
 const shuffleFrom = (tracks: AudixTrack[], pinned: AudixTrack | null) => {
@@ -72,178 +80,224 @@ const shuffleFrom = (tracks: AudixTrack[], pinned: AudixTrack | null) => {
 };
 
 export function PlaybackProvider({ children }: { children: ReactNode }) {
-  const player = useAudioPlayer(null, { updateInterval: 250 });
-  const status = useAudioPlayerStatus(player);
+  // Two decks. Deck A alone is used until crossfade is switched on, so the
+  // zero-crossfade path stays byte-for-byte the single-player behaviour.
+  const deckA = useAudioPlayer(null, { updateInterval: 250 });
+  const deckB = useAudioPlayer(null, { updateInterval: 250 });
+  const [onB, setOnB] = useState(false);
 
-  // `baseQueue` keeps the original ordering so shuffle can be turned off again.
+  const active = onB ? deckB : deckA;
+  const idle = onB ? deckA : deckB;
+  const status = useAudioPlayerStatus(active);
+
   const [baseQueue, setBaseQueue] = useState<AudixTrack[]>([]);
   const [queue, setQueue] = useState<AudixTrack[]>([]);
   const [index, setIndex] = useState(-1);
   const [rate, setRateState] = useState(1);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>('none');
+  const [crossfade, setCrossfadeState] = useState(0);
+  const [volume, setVolumeState] = useState(1);
 
   const trackStartHandler = useRef<((track: AudixTrack) => void) | null>(null);
   const startedTrackId = useRef<string | null>(null);
   const wasFinished = useRef(false);
-  const repeatRef = useRef(repeat);
+  const fadeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fading = useRef(false);
+
+  const repeatRef = useRef(repeat); repeatRef.current = repeat;
+  const crossfadeRef = useRef(crossfade); crossfadeRef.current = crossfade;
+  const volumeRef = useRef(volume); volumeRef.current = volume;
+  const rateRef = useRef(rate); rateRef.current = rate;
 
   const current = index >= 0 ? (queue[index] ?? null) : null;
-  const currentRef = useRef<AudixTrack | null>(current);
-
-  useEffect(() => {
-    repeatRef.current = repeat;
-  }, [repeat]);
-
-  useEffect(() => {
-    currentRef.current = current;
-  }, [current]);
+  const currentRef = useRef<AudixTrack | null>(current); currentRef.current = current;
+  const queueRef = useRef(queue); queueRef.current = queue;
+  const indexRef = useRef(index); indexRef.current = index;
 
   // --- audio session -------------------------------------------------------
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    // `doNotMix` is required by expo-audio for lock screen controls to bind.
     setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: 'doNotMix',
       shouldRouteThroughEarpiece: false,
     }).catch(() => undefined);
-    if (Platform.OS === 'android') {
-      // Without this the media notification (and >3min background audio) is denied.
-      requestNotificationPermissionsAsync().catch(() => undefined);
+    if (Platform.OS === 'android') requestNotificationPermissionsAsync().catch(() => undefined);
+  }, []);
+
+  const stopFade = useCallback(() => {
+    if (fadeTimer.current) clearInterval(fadeTimer.current);
+    fadeTimer.current = null;
+    fading.current = false;
+  }, []);
+
+  /** Per-track gain lets a quiet master sit level with a loud one. */
+  const gainFor = useCallback((track: AudixTrack | null) => {
+    const raw = (track as { gain?: number } | null)?.gain;
+    const trackGain = typeof raw === 'number' && raw > 0 ? Math.min(raw, 2) : 1;
+    return Math.max(0, Math.min(1, volumeRef.current * trackGain));
+  }, []);
+
+  const bindLockScreen = useCallback((player: AudioPlayer, track: AudixTrack | null) => {
+    try {
+      if (!track) { player.clearLockScreenControls(); return; }
+      player.setActiveForLockScreen(
+        true,
+        { title: track.title, artist: track.artist, albumTitle: track.album ?? 'DA Audix · Catalogue privé' },
+        { showSeekForward: true, showSeekBackward: true, isLiveStream: false },
+      );
+    } catch {
+      // Best effort: unsupported on some web targets.
     }
   }, []);
 
-  // --- lock screen ---------------------------------------------------------
-  const bindLockScreen = useCallback(
-    (track: AudixTrack | null) => {
+  const loadInto = useCallback((player: AudioPlayer, track: AudixTrack | null, autoPlay: boolean) => {
+    if (!isPlayable(track)) { player.pause(); return; }
+    player.replace(track.uri);
+    player.setPlaybackRate(rateRef.current);
+    player.volume = gainFor(track);
+    if (autoPlay) player.play();
+  }, [gainFor]);
+
+  const goToIndex = useCallback((nextIndex: number, autoPlay = true) => {
+    const list = queueRef.current;
+    if (nextIndex < 0 || nextIndex >= list.length) return;
+    stopFade();
+    idle.pause();
+    setIndex(nextIndex);
+    loadInto(active, list[nextIndex], autoPlay);
+    bindLockScreen(active, list[nextIndex]);
+  }, [active, bindLockScreen, idle, loadInto, stopFade]);
+
+  // --- crossfade -----------------------------------------------------------
+  /** Ramps the outgoing deck down while the incoming deck rises, then swaps. */
+  const beginCrossfade = useCallback((nextIndex: number) => {
+    const list = queueRef.current;
+    const incoming = list[nextIndex];
+    if (!isPlayable(incoming) || fading.current) return;
+
+    fading.current = true;
+    const seconds = crossfadeRef.current;
+    const steps = Math.max(1, Math.round((seconds * 1000) / FADE_TICK_MS));
+    const fromDeck = active;
+    const toDeck = idle;
+    const target = gainFor(incoming);
+
+    loadInto(toDeck, incoming, true);
+    toDeck.volume = 0;
+    // Hand the lock screen over immediately: the incoming track is what the
+    // user is about to hear, so metadata should not lag behind the audio.
+    bindLockScreen(toDeck, incoming);
+
+    let step = 0;
+    fadeTimer.current = setInterval(() => {
+      step += 1;
+      const ratio = Math.min(1, step / steps);
       try {
-        if (!track) {
-          player.clearLockScreenControls();
-          return;
-        }
-        player.setActiveForLockScreen(
-          true,
-          {
-            title: track.title,
-            artist: track.artist,
-            albumTitle: track.album ?? 'DA Audix · Catalogue privé',
-          },
-          { showSeekForward: true, showSeekBackward: true, isLiveStream: false },
-        );
+        fromDeck.volume = target * (1 - ratio);
+        toDeck.volume = target * ratio;
       } catch {
-        // Lock screen controls are best-effort (unsupported on some web targets).
+        // Deck released mid-fade.
       }
-    },
-    [player],
-  );
-
-  // --- loading -------------------------------------------------------------
-  const loadIntoPlayer = useCallback(
-    (track: AudixTrack | null, autoPlay: boolean) => {
-      if (!isPlayable(track)) {
-        player.pause();
-        bindLockScreen(null);
-        return;
+      if (ratio >= 1) {
+        stopFade();
+        try { fromDeck.pause(); } catch { /* already gone */ }
+        setOnB((value) => !value);
+        setIndex(nextIndex);
       }
-      player.replace(track.uri);
-      player.setPlaybackRate(rate);
-      bindLockScreen(track);
-      if (autoPlay) player.play();
-    },
-    [bindLockScreen, player, rate],
-  );
+    }, FADE_TICK_MS);
+  }, [active, bindLockScreen, gainFor, idle, loadInto, stopFade]);
 
-  const goToIndex = useCallback(
-    (nextIndex: number, autoPlay = true) => {
-      if (nextIndex < 0 || nextIndex >= queue.length) return;
-      setIndex(nextIndex);
-      loadIntoPlayer(queue[nextIndex], autoPlay);
-    },
-    [loadIntoPlayer, queue],
-  );
+  useEffect(() => () => stopFade(), [stopFade]);
 
-  const playTrack = useCallback(
-    (track: AudixTrack, nextQueue?: AudixTrack[]) => {
-      const pool = (nextQueue ?? queue).filter((item) => !item.externalUrl && Boolean(item.uri));
-      // The requested track always belongs to its own queue, even if the
-      // surrounding view was filtered down to something that excludes it.
-      const resolved = pool.some((item) => item.id === track.id) ? pool : [track, ...pool];
-      const ordered = shuffle ? shuffleFrom(resolved, track) : resolved;
-      const position = Math.max(
-        ordered.findIndex((item) => item.id === track.id),
-        0,
-      );
-      setBaseQueue(resolved);
-      setQueue(ordered);
-      setIndex(position);
-      loadIntoPlayer(ordered[position], true);
-    },
-    [loadIntoPlayer, queue, shuffle],
-  );
+  // Watch the tail of the current track and start the fade in time.
+  useEffect(() => {
+    if (crossfade <= 0 || fading.current || !current) return;
+    if (!status.playing || !status.duration) return;
+    const remaining = status.duration - status.currentTime;
+    if (remaining > crossfade || remaining <= 0) return;
+    if (repeatRef.current === 'one') return;
+
+    const list = queueRef.current;
+    const nextIndex =
+      indexRef.current + 1 < list.length ? indexRef.current + 1
+      : repeatRef.current === 'all' ? 0
+      : -1;
+    if (nextIndex >= 0) beginCrossfade(nextIndex);
+  }, [beginCrossfade, crossfade, current, status.currentTime, status.duration, status.playing]);
 
   // --- transport -----------------------------------------------------------
-  const play = useCallback(() => {
-    if (!isPlayable(currentRef.current)) return;
-    player.play();
-  }, [player]);
+  const playTrack = useCallback((track: AudixTrack, nextQueue?: AudixTrack[]) => {
+    stopFade();
+    idle.pause();
+    const pool = (nextQueue ?? queueRef.current).filter((item) => isPlayable(item));
+    const resolved = pool.some((item) => item.id === track.id) ? pool : [track, ...pool];
+    const ordered = shuffle ? shuffleFrom(resolved, track) : resolved;
+    const position = Math.max(ordered.findIndex((item) => item.id === track.id), 0);
+    setBaseQueue(resolved);
+    setQueue(ordered);
+    setIndex(position);
+    loadInto(active, ordered[position], true);
+    bindLockScreen(active, ordered[position]);
+  }, [active, bindLockScreen, idle, loadInto, shuffle, stopFade]);
 
-  const pause = useCallback(() => player.pause(), [player]);
-
+  const play = useCallback(() => { if (isPlayable(currentRef.current)) active.play(); }, [active]);
+  const pause = useCallback(() => { stopFade(); active.pause(); }, [active, stopFade]);
   const toggle = useCallback(() => {
     if (!isPlayable(currentRef.current)) return;
-    if (status.playing) player.pause();
-    else player.play();
-  }, [player, status.playing]);
+    if (status.playing) pause(); else active.play();
+  }, [active, pause, status.playing]);
 
   const next = useCallback(() => {
-    if (!queue.length) return;
-    if (index + 1 < queue.length) return goToIndex(index + 1);
+    const list = queueRef.current;
+    if (!list.length) return;
+    if (indexRef.current + 1 < list.length) return goToIndex(indexRef.current + 1);
     if (repeatRef.current === 'all') return goToIndex(0);
-    player.pause();
-  }, [goToIndex, index, player, queue.length]);
+    active.pause();
+  }, [active, goToIndex]);
 
   const previous = useCallback(() => {
-    if (!queue.length) return;
-    // Mirrors every mainstream player: rewind first, skip back only if near the start.
-    if (status.currentTime > RESTART_THRESHOLD) {
-      player.seekTo(0);
-      return;
+    const list = queueRef.current;
+    if (!list.length) return;
+    if (status.currentTime > RESTART_THRESHOLD) { active.seekTo(0); return; }
+    if (indexRef.current - 1 >= 0) return goToIndex(indexRef.current - 1);
+    if (repeatRef.current === 'all') return goToIndex(list.length - 1);
+    active.seekTo(0);
+  }, [active, goToIndex, status.currentTime]);
+
+  const seekTo = useCallback((seconds: number) => {
+    const max = status.duration || 0;
+    active.seekTo(Math.min(Math.max(seconds, 0), max || seconds));
+  }, [active, status.duration]);
+  const seekBy = useCallback((delta: number) => seekTo(status.currentTime + delta), [seekTo, status.currentTime]);
+
+  const setRate = useCallback((value: number) => {
+    setRateState(value);
+    active.setPlaybackRate(value, 'high');
+  }, [active]);
+
+  const setCrossfade = useCallback((seconds: number) => {
+    if (seconds <= 0) stopFade();
+    setCrossfadeState(seconds);
+  }, [stopFade]);
+
+  const setVolume = useCallback((value: number) => {
+    const clamped = Math.max(0, Math.min(1, value));
+    setVolumeState(clamped);
+    volumeRef.current = clamped;
+    if (!fading.current) {
+      try { active.volume = gainFor(currentRef.current); } catch { /* not loaded */ }
     }
-    if (index - 1 >= 0) return goToIndex(index - 1);
-    if (repeatRef.current === 'all') return goToIndex(queue.length - 1);
-    player.seekTo(0);
-  }, [goToIndex, index, player, queue.length, status.currentTime]);
-
-  const seekTo = useCallback(
-    (seconds: number) => {
-      const max = status.duration || 0;
-      player.seekTo(Math.min(Math.max(seconds, 0), max || seconds));
-    },
-    [player, status.duration],
-  );
-
-  const seekBy = useCallback(
-    (delta: number) => seekTo(status.currentTime + delta),
-    [seekTo, status.currentTime],
-  );
-
-  const setRate = useCallback(
-    (value: number) => {
-      setRateState(value);
-      player.setPlaybackRate(value, 'high');
-    },
-    [player],
-  );
+  }, [active, gainFor]);
 
   const stop = useCallback(() => {
-    player.pause();
-    bindLockScreen(null);
-    setIndex(-1);
-    setQueue([]);
-    setBaseQueue([]);
-  }, [bindLockScreen, player]);
+    stopFade();
+    deckA.pause(); deckB.pause();
+    bindLockScreen(active, null);
+    setIndex(-1); setQueue([]); setBaseQueue([]);
+  }, [active, bindLockScreen, deckA, deckB, stopFade]);
 
   const toggleShuffle = useCallback(() => {
     setShuffle((wasOn) => {
@@ -260,32 +314,24 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     setRepeat((mode) => (mode === 'none' ? 'all' : mode === 'all' ? 'one' : 'none'));
   }, []);
 
-  // --- auto-advance --------------------------------------------------------
+  // --- auto-advance (crossfade off, or last track) --------------------------
   useEffect(() => {
-    // didJustFinish stays true across several status ticks, so act only on the
-    // rising edge. Keying on the track id instead would leave repeat:'one'
-    // permanently armed after its first loop.
     const finished = Boolean(status.didJustFinish);
     const isEdge = finished && !wasFinished.current;
     wasFinished.current = finished;
-    if (!isEdge || !current) return;
-
-    if (repeatRef.current === 'one') {
-      player.seekTo(0);
-      player.play();
-      return;
-    }
+    if (!isEdge || !current || fading.current) return;
+    if (repeatRef.current === 'one') { active.seekTo(0); active.play(); return; }
     next();
-  }, [current, next, player, status.didJustFinish]);
+  }, [active, current, next, status.didJustFinish]);
 
-  // --- gapless: warm the next source while the current one plays ------------
+  // --- gapless: warm the next source ---------------------------------------
   useEffect(() => {
     const upcoming = queue[index + 1] ?? (repeat === 'all' ? queue[0] : null);
     if (!isPlayable(upcoming)) return;
     preload(upcoming.uri, { preferredForwardBufferDuration: 20 }).catch(() => undefined);
   }, [index, queue, repeat]);
 
-  // --- play-count callback -------------------------------------------------
+  // --- play-count ----------------------------------------------------------
   useEffect(() => {
     if (!current || !status.playing) return;
     if (startedTrackId.current === current.id) return;
@@ -293,54 +339,35 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     trackStartHandler.current?.(current);
   }, [current, status.playing]);
 
-  // Keep lock screen metadata alive when iOS re-activates the app.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active' && currentRef.current) bindLockScreen(currentRef.current);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && currentRef.current) bindLockScreen(active, currentRef.current);
     });
     return () => sub.remove();
-  }, [bindLockScreen]);
+  }, [active, bindLockScreen]);
 
   const onTrackStart = useCallback((handler: (track: AudixTrack) => void) => {
     trackStartHandler.current = handler;
   }, []);
 
-  const value = useMemo<PlaybackValue>(
-    () => ({
-      current,
-      queue,
-      index,
-      currentTime: status.currentTime ?? 0,
-      duration: status.duration ?? 0,
-      playing: status.playing ?? false,
-      isBuffering: status.isBuffering ?? false,
-      isLoaded: status.isLoaded ?? false,
-      rate,
-      shuffle,
-      repeat,
-      hasNext: index >= 0 && (index + 1 < queue.length || repeat === 'all'),
-      hasPrevious: index > 0 || repeat === 'all',
-      playTrack,
-      toggle,
-      play,
-      pause,
-      next,
-      previous,
-      seekTo,
-      seekBy,
-      setRate,
-      toggleShuffle,
-      cycleRepeat,
-      stop,
-      onTrackStart,
-    }),
-    [
-      current, queue, index, status.currentTime, status.duration, status.playing,
-      status.isBuffering, status.isLoaded, rate, shuffle, repeat, playTrack, toggle,
-      play, pause, next, previous, seekTo, seekBy, setRate, toggleShuffle, cycleRepeat,
-      stop, onTrackStart,
-    ],
-  );
+  const value = useMemo<PlaybackValue>(() => ({
+    current, queue, index,
+    currentTime: status.currentTime ?? 0,
+    duration: status.duration ?? 0,
+    playing: status.playing ?? false,
+    isBuffering: status.isBuffering ?? false,
+    isLoaded: status.isLoaded ?? false,
+    rate, shuffle, repeat, crossfade, volume,
+    hasNext: index >= 0 && (index + 1 < queue.length || repeat === 'all'),
+    hasPrevious: index > 0 || repeat === 'all',
+    playTrack, toggle, play, pause, next, previous, seekTo, seekBy,
+    setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
+  }), [
+    current, queue, index, status.currentTime, status.duration, status.playing,
+    status.isBuffering, status.isLoaded, rate, shuffle, repeat, crossfade, volume,
+    playTrack, toggle, play, pause, next, previous, seekTo, seekBy,
+    setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
+  ]);
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;
 }

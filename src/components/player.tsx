@@ -6,7 +6,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ExternalPlayer } from '@/components/external-player';
 import { Waveform } from '@/components/waveform';
 import { Colors, Gradients } from '@/constants/theme';
-import { PLAYBACK_RATES, usePlayback } from '@/lib/playback';
+import { CROSSFADE_CHOICES, PLAYBACK_RATES, usePlayback } from '@/lib/playback';
 import type { AudixTrack } from '@/types/media';
 
 const formatTime = (seconds: number) => {
@@ -36,13 +36,18 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
     return <ExternalPlayer track={track} onToggleFavorite={onToggleFavorite} />;
   }
 
-  const { currentTime, duration, playing, isBuffering, rate, shuffle, repeat } = playback;
+  const { currentTime, duration, playing, isBuffering, rate, shuffle, repeat, crossfade } = playback;
   const progress = duration > 0 ? currentTime / duration : 0;
   const active = playback.current ?? track;
 
   const cycleRate = () => {
     const position = PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]);
     playback.setRate(PLAYBACK_RATES[(position + 1) % PLAYBACK_RATES.length]);
+  };
+
+  const cycleCrossfade = () => {
+    const position = CROSSFADE_CHOICES.indexOf(crossfade as (typeof CROSSFADE_CHOICES)[number]);
+    playback.setCrossfade(CROSSFADE_CHOICES[(position + 1) % CROSSFADE_CHOICES.length]);
   };
 
   return (
@@ -148,6 +153,13 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
           <Text style={styles.pillText}>15</Text>
           <Ionicons name="play-forward" size={15} color={Colors.text} />
         </Pressable>
+        <Pressable
+          accessibilityLabel={crossfade ? `Fondu enchaîné ${crossfade} secondes` : 'Fondu enchaîné désactivé'}
+          onPress={cycleCrossfade}
+          style={[styles.pill, crossfade > 0 && styles.pillOn]}>
+          <Ionicons name="git-compare-outline" size={15} color={crossfade > 0 ? Colors.cyan : Colors.textMuted} />
+          <Text style={styles.pillText}>{crossfade > 0 ? `${crossfade}s` : 'Fondu'}</Text>
+        </Pressable>
         <Pressable accessibilityLabel="Importer des fichiers" onPress={onImport} style={styles.pill}>
           <Ionicons name="add" size={16} color={Colors.cyan} />
           <Text style={styles.pillText}>Importer</Text>
@@ -180,5 +192,6 @@ const styles = StyleSheet.create({
   repeatOneDot: { position: 'absolute', bottom: 8, width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.cyan },
   secondaryRow: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
   pill: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 17, backgroundColor: Colors.surfaceRaised },
+  pillOn: { backgroundColor: '#0B2630' },
   pillText: { color: Colors.text, fontWeight: '800', fontSize: 11 },
 });
