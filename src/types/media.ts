@@ -7,7 +7,7 @@ export type MediaOrigin =
   | 'facebook-export'
   | 'spotify-catalog';
 
-export type VoxaTrack = {
+export type AudixTrack = {
   id: string;
   title: string;
   artist: string;
@@ -23,11 +23,15 @@ export type VoxaTrack = {
   lastPlayedAt?: string;
   playCount: number;
   size?: number;
+  externalUrl?: string;
 };
 
-export type VoxaPlaylist = {
+export type AudixPlaylist = {
   id: string;
   name: string;
+  description: string;
+  color: string;
   trackIds: string[];
   createdAt: string;
+  updatedAt: string;
 };

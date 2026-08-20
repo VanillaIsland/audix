@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "VOXA",
-    "slug": "voxa",
-    "version": "0.1.0",
+    "name": "Audix",
+    "slug": "audix",
+    "version": "0.2.0",
     "orientation": "portrait",
-    "icon": "./assets/brand/voxa-app-icon.png",
-    "scheme": "voxa",
+    "icon": "./assets/brand/audix-app-icon.png",
+    "scheme": "audix",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#050609",
     "ios": {
-      "bundleIdentifier": "com.vanillaisland.voxa",
+      "bundleIdentifier": "com.vanillaisland.audix",
       "buildNumber": "1",
       "supportsTablet": true,
       "config": {
@@ -17,18 +17,24 @@
       }
     },
     "android": {
-      "package": "com.vanillaisland.voxa",
+      "package": "com.vanillaisland.audix",
       "versionCode": 1,
-      "icon": "./assets/brand/voxa-app-icon.png",
+      "icon": "./assets/brand/audix-app-icon.png",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/brand/voxa-app-icon.png"
+        "foregroundImage": "./assets/brand/audix-app-icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/brand/voxa-app-icon.png"
+      "favicon": "./assets/brand/audix-app-icon.png"
     },
     "plugins": [
       "expo-router",
@@ -36,7 +42,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#000000",
-          "image": "./assets/brand/voxa-app-icon.png",
+          "image": "./assets/brand/audix-app-icon.png",
           "imageWidth": 180
         }
       ],
@@ -48,11 +54,19 @@
           "enableBackgroundPlayback": true,
           "enableBackgroundRecording": false
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ed48510a-5690-4559-a498-8a74cec62f65"
+      }
+    },
+    "owner": "da-audix"
   }
 }
