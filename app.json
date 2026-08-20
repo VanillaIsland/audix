@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Audix",
+    "name": "DA Audix",
     "slug": "audix",
     "version": "0.2.0",
     "orientation": "portrait",
@@ -10,7 +10,6 @@
     "backgroundColor": "#050609",
     "ios": {
       "bundleIdentifier": "com.vanillaisland.audix",
-      "buildNumber": "1",
       "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false

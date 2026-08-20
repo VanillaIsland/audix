@@ -128,7 +128,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
           {
             title: track.title,
             artist: track.artist,
-            albumTitle: track.album ?? 'Audix · Catalogue privé',
+            albumTitle: track.album ?? 'DA Audix · Catalogue privé',
           },
           { showSeekForward: true, showSeekBackward: true, isLiveStream: false },
         );

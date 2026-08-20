@@ -157,7 +157,7 @@ export default function HomeScreen() {
 
           {section === 'play' ? <LibraryPanel title="Bibliothèque" eyebrow="LOCAL-FIRST VAULT" tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id)} onFavorite={library.toggleFavorite} emptyIcon="pulse-outline" emptyTitle="Ton univers audio attend son premier signal" onEmptyAction={() => navigate('grab')} /> : null}
 
-          <View style={styles.footer}><Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.footerIcon} /><Text style={styles.footerBrand}>AUDIX · SMART AUDIO PLAYER · MVP 0.1</Text></View>
+          <View style={styles.footer}><Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.footerIcon} /><Text style={styles.footerBrand}>DA AUDIX · SMART AUDIO PLAYER · MVP 0.1</Text></View>
         </ScrollView>
       </SafeAreaView>
 
