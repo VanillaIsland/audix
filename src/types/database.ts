@@ -62,6 +62,7 @@ export type Database = {
           id: string
           kind: string
           last_played_at: string | null
+          local_id: string | null
           metadata: Json
           mime_type: string
           musical_key: string | null
@@ -87,6 +88,7 @@ export type Database = {
           id?: string
           kind: string
           last_played_at?: string | null
+          local_id?: string | null
           metadata?: Json
           mime_type: string
           musical_key?: string | null
@@ -112,6 +114,7 @@ export type Database = {
           id?: string
           kind?: string
           last_played_at?: string | null
+          local_id?: string | null
           metadata?: Json
           mime_type?: string
           musical_key?: string | null
@@ -174,6 +177,7 @@ export type Database = {
           id: string
           is_shared: boolean
           is_smart: boolean
+          local_id: string | null
           name: string
           share_token: string
           smart_rules: Json
@@ -187,6 +191,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           is_smart?: boolean
+          local_id?: string | null
           name: string
           share_token?: string
           smart_rules?: Json
@@ -200,6 +205,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           is_smart?: boolean
+          local_id?: string | null
           name?: string
           share_token?: string
           smart_rules?: Json
