@@ -24,7 +24,7 @@ export type GrabResolution = {
 export async function resolveGrabLink(url: string): Promise<GrabResolution> {
   const trimmed = url.trim();
   if (!trimmed) throw new Error('Colle un lien à analyser.');
-  if (!supabase) throw new Error('Supabase non configuré : le résolveur est indisponible.');
+  if (!supabase) throw new Error('Supabase n’est pas configuré, l’analyse de lien est indisponible.');
 
   const { data, error } = await supabase.functions.invoke('grab-resolve', { body: { url: trimmed } });
 
@@ -37,7 +37,7 @@ export async function resolveGrabLink(url: string): Promise<GrabResolution> {
 }
 
 export const formatSize = (bytes: number | null) => {
-  if (!bytes) return '—';
+  if (!bytes) return 'Taille inconnue';
   if (bytes > 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} Go`;
   if (bytes > 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} Mo`;
   return `${Math.round(bytes / 1_000)} Ko`;

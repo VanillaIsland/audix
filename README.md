@@ -1,28 +1,28 @@
-# AUDIX — Smart Audio Player
+# Audix, lecteur audio privé
 
-Audix est un lecteur local-first pour catalogues audio/vidéo propriétaires. Le même projet Expo cible iOS, Android et une preview web.
+Audix est un lecteur pensé pour les catalogues audio et vidéo dont tu es propriétaire. Tout est stocké d'abord sur l'appareil. Le même projet Expo produit l'app iOS, l'app Android et une preview web.
 
-## MVP 0.2
+## Ce que fait la version 0.2
 
-- lecture audio locale et audio-only depuis un fichier vidéo compatible ;
-- lecture en arrière-plan et contrôles écran verrouillé sur les builds natifs ;
-- import de MP3, WAV, FLAC, AAC, ALAC, OGG, OPUS, M4A, AIFF, MP4, MOV, WebM et MKV ;
-- bibliothèque privée persistée sur l’appareil ;
-- création de playlists personnelles avec nom, description, couleur, ajout/retrait de titres et suppression confirmée ;
-- historique, favoris, téléchargements et recherche ;
-- Grab de liens directs HTTP(S) avec détection de source, attestation de droits et routage vers une playlist ;
-- références YouTube, Spotify et Facebook lisibles via les lecteurs officiels intégrés quand la plateforme l’autorise ;
-- recherche par titre et artiste avec raccourcis vers les recherches officielles ; résultats YouTube intégrés avec une clé YouTube Data API ;
-- schéma Supabase avec Row Level Security pour la future synchronisation privée ;
-- preview web statique déployable sur Netlify.
+Audix lit les fichiers audio locaux et sort le son d'un fichier vidéo compatible. La lecture continue en arrière-plan et les contrôles restent disponibles sur l'écran verrouillé des versions natives.
 
-## Limites volontaires
+L'import accepte le MP3, le WAV, le FLAC, l'AAC, l'ALAC, l'OGG, l'OPUS, le M4A, l'AIFF, le MP4, le MOV, le WebM et le MKV.
 
-Audix n’intègre aucun bloqueur publicitaire, contournement de DRM ou extracteur tiers pour YouTube, Spotify ou Facebook. Les liens de plateformes sont conservés comme références et lus avec leurs lecteurs officiels. Le téléchargement hors ligne est réservé aux masters directs autorisés importés dans les builds mobiles.
+La bibliothèque reste privée et persiste sur l'appareil. Tu peux créer des playlists avec un nom, une description et une couleur, y ajouter ou retirer des titres, et supprimer une playlist après confirmation. L'historique, les favoris, les téléchargements et la recherche sont là.
+
+Le mode Grab analyse un lien direct ou un lien de transfert, détecte la source, demande une attestation de droits et route le résultat vers la bibliothèque ou vers une playlist.
+
+Les références YouTube, Spotify et Facebook sont lisibles dans les lecteurs officiels intégrés quand la plateforme l'autorise. La recherche par titre et artiste affiche les résultats YouTube directement dans l'app lorsqu'une clé YouTube Data API est configurée.
+
+Côté serveur, un schéma Supabase protégé par Row Level Security prépare la synchronisation privée des métadonnées. La preview web se déploie sur Netlify.
+
+## Ce qu'Audix ne fait pas
+
+Audix n'intègre aucun bloqueur de publicité, aucun contournement de DRM et aucun extracteur tiers pour YouTube, Spotify ou Facebook. Les liens de plateformes sont conservés comme références et lus avec les lecteurs officiels. Le hors-ligne est réservé aux masters directs que tu es autorisé à importer.
 
 ## Démarrer
 
-Prérequis : Node.js 22.13+.
+Il faut Node.js 22.13 ou plus récent.
 
 ```bash
 npm install
@@ -30,7 +30,7 @@ cp .env.example .env.local
 npm run web
 ```
 
-Variables publiques attendues :
+Les variables publiques attendues sont les suivantes.
 
 ```text
 EXPO_PUBLIC_SUPABASE_URL
@@ -38,9 +38,9 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 EXPO_PUBLIC_YOUTUBE_API_KEY
 ```
 
-La clé YouTube est optionnelle : sans elle, Audix ouvre les pages de recherche officielles YouTube, Spotify et Facebook. Avec elle, la recherche YouTube affiche directement les résultats dans l’interface.
+La clé YouTube est facultative. Sans elle, Audix ouvre les pages de recherche officielles de YouTube, Spotify et Facebook. Avec elle, les résultats s'affichent dans l'interface.
 
-Ne jamais placer de clé `service_role` ou `sb_secret_...` dans l’application.
+Ne place jamais une clé `service_role` ou `sb_secret_...` dans l'application.
 
 ## Vérifier
 
@@ -52,30 +52,30 @@ npm run build:web
 
 ## Architecture cible
 
-1. **PLAY** — player natif, queue, gapless, crossfade, vitesse et contrôles système.
-2. **LIBRARY** — catalogue local-first, métadonnées, favoris, historique et smart playlists.
-3. **WAVE** — waveform, marqueurs, silences, BPM et tonalité.
-4. **TOOLS** — conversion et édition par lots dans un module natif/desktop dédié.
-5. **AI** — transcription, tags et recherche naturelle sur traitements opt-in.
+1. Lecture : player natif, file d'attente, gapless, fondu enchaîné, vitesse variable et contrôles système.
+2. Bibliothèque : catalogue local, métadonnées, favoris, historique et playlists intelligentes.
+3. Waveform : forme d'onde, marqueurs, silences, BPM et tonalité.
+4. Outils : conversion et édition par lots dans un module natif dédié.
+5. IA : transcription, tags et recherche en langage naturel, sur traitements activés par l'utilisateur.
 
-Netlify héberge uniquement la preview web. Les versions iOS/Android seront générées avec EAS Build puis distribuées via TestFlight et Google Play Internal Testing.
+Netlify n'héberge que la preview web. Les versions iOS et Android sont générées avec EAS Build, puis distribuées via TestFlight et Google Play Internal Testing.
 
 ## Envoyer sur TestFlight
 
-Prérequis : un compte Expo et une adhésion Apple Developer active. Depuis ce dossier :
+Il faut un compte Expo et une adhésion Apple Developer active. Depuis ce dossier :
 
 ```bash
 npx eas-cli login
 npx testflight
 ```
 
-Le second script configure les certificats, crée un build iOS de production et l’envoie dans App Store Connect. Après le traitement Apple, ouvre **App Store Connect → Audix → TestFlight**, complète les informations de test et ajoute les testeurs internes.
+Le second script configure les certificats, crée un build iOS de production et l'envoie dans App Store Connect. Une fois le traitement Apple terminé, ouvre App Store Connect, section Audix puis TestFlight, complète les informations de test et ajoute les testeurs internes.
 
-Pour séparer les étapes :
+Pour séparer les deux étapes :
 
 ```bash
 npm run build:ios:testflight
 npm run submit:ios:testflight
 ```
 
-Le bundle iOS réservé est `com.vanillaisland.audix`. Un identifiant différent exige une modification de `app.json` avant le premier envoi.
+L'identifiant de bundle iOS réservé est `com.vanillaisland.audix`. Un identifiant différent demande une modification d'app.json avant le premier envoi.

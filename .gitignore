@@ -42,3 +42,6 @@ example
 # generated native folders
 /ios
 /android
+
+# fichiers ecartes, a supprimer a la main
+_to_delete/

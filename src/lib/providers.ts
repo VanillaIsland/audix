@@ -80,11 +80,11 @@ export async function searchYouTube(query: string, maxResults = 15): Promise<Pro
       return (data.items as RawItem[]).map(normalise).filter(Boolean) as ProviderResult[];
     }
     if (!youtubeReady()) {
-      throw new Error(data?.error ?? error?.message ?? 'Recherche indisponible côté serveur.');
+      throw new Error(data?.error ?? error?.message ?? 'La recherche est indisponible côté serveur.');
     }
   }
 
-  if (!youtubeReady()) throw new Error('Aucune source de recherche configurée.');
+  if (!youtubeReady()) throw new Error('Aucune source de recherche n’est configurée.');
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -96,7 +96,7 @@ export async function searchYouTube(query: string, maxResults = 15): Promise<Pro
   });
   const response = await fetch(`${YOUTUBE_SEARCH}?${params.toString()}`);
   if (response.status === 403) {
-    throw new Error('Quota YouTube dépassé, ou clé restreinte à une autre plateforme.');
+    throw new Error('La recherche YouTube ne répond pas : quota dépassé, ou clé restreinte à une autre plateforme.');
   }
   if (!response.ok) throw new Error(`Recherche YouTube indisponible (${response.status}).`);
 

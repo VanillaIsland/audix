@@ -15,7 +15,7 @@ export function ExternalPlayer({ track, onToggleFavorite }: { track: AudixTrack;
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={[styles.platformDot, { backgroundColor: platform?.color ?? Colors.cyan }]} />
-        <View style={styles.meta}><Text style={styles.eyebrow}>OFFICIAL EMBED · {platform?.label.toUpperCase() ?? 'WEB'}</Text><Text style={styles.title} numberOfLines={1}>{track.title}</Text><Text style={styles.subtitle}>La lecture suit les règles de la plateforme.</Text></View>
+        <View style={styles.meta}><Text style={styles.eyebrow}>Lecteur officiel {platform?.label ?? 'web'}</Text><Text style={styles.title} numberOfLines={1}>{track.title}</Text><Text style={styles.subtitle}>La lecture suit les règles de la plateforme.</Text></View>
         <Pressable onPress={() => onToggleFavorite(track.id)} style={styles.iconButton}><Ionicons name={track.favorite ? 'heart' : 'heart-outline'} size={21} color={track.favorite ? Colors.purple : Colors.textMuted} /></Pressable>
       </View>
       {embedUrl ? <WebView source={{ uri: embedUrl }} allowsInlineMediaPlayback mediaPlaybackRequiresUserAction style={styles.webview} /> : null}
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   platformDot: { width: 8, height: 44, borderRadius: 5 },
   meta: { flex: 1, gap: 3 },
-  eyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  eyebrow: { color: Colors.cyan, fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
   title: { color: Colors.text, fontSize: 17, fontWeight: '900' },
   subtitle: { color: Colors.textMuted, fontSize: 9 },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

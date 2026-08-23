@@ -50,7 +50,7 @@ const playlistRow = (playlist: AudixPlaylist, userId: string) => ({
 /** Envoie l'état local vers Supabase. Renvoie le nombre de lignes traitées. */
 export async function pushLibrary(tracks: AudixTrack[], playlists: AudixPlaylist[]) {
   const userId = await ensureSession();
-  if (!supabase || !userId) throw new Error('Session Supabase indisponible.');
+  if (!supabase || !userId) throw new Error('La session Supabase est indisponible.');
 
   if (tracks.length) {
     const { error } = await supabase
@@ -93,7 +93,7 @@ export type RemoteTrack = {
  */
 export async function pullLibrary(): Promise<AudixTrack[]> {
   const userId = await ensureSession();
-  if (!supabase || !userId) throw new Error('Session Supabase indisponible.');
+  if (!supabase || !userId) throw new Error('La session Supabase est indisponible.');
 
   const { data, error } = await supabase
     .from('media_items')

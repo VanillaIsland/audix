@@ -61,11 +61,11 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
           <View style={styles.liveRow}>
             <View style={[styles.liveDot, playing && styles.liveDotOn]} />
             <Text style={styles.eyebrow}>
-              {isBuffering ? 'CHARGEMENT' : playing ? 'NOW PLAYING' : active ? 'EN PAUSE' : 'PRÊT À LIRE'}
+              {isBuffering ? 'Chargement' : playing ? 'Lecture en cours' : active ? 'En pause' : 'Prêt à lire'}
             </Text>
           </View>
-          <Text style={styles.title} numberOfLines={1}>{active?.title ?? 'Importe ton premier master'}</Text>
-          <Text style={styles.artist} numberOfLines={1}>{active?.artist ?? 'Audio & vidéo propriétaire'}</Text>
+          <Text style={styles.title} numberOfLines={1}>{active?.title ?? 'Aucun titre chargé'}</Text>
+          <Text style={styles.artist} numberOfLines={1}>{active?.artist ?? 'Importe un fichier pour commencer'}</Text>
         </View>
         <Pressable
           disabled={!active}
@@ -94,7 +94,7 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
       <View style={styles.timeRow}>
         <Text style={styles.time}>{formatTime(currentTime)}</Text>
         <Text style={styles.quality}>
-          {active?.kind === 'video' ? 'VIDEO · AUDIO MODE' : 'LOCAL · ORIGINAL'}
+          {active?.kind === 'video' ? 'Vidéo lue en audio' : 'Fichier local'}
           {playback.queue.length > 1 ? ` · ${playback.index + 1}/${playback.queue.length}` : ''}
         </Text>
         <Text style={styles.time}>{formatTime(duration)}</Text>
@@ -178,14 +178,14 @@ const styles = StyleSheet.create({
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textMuted },
   liveDotOn: { backgroundColor: Colors.cyan },
-  eyebrow: { color: Colors.cyan, fontWeight: '800', fontSize: 10, letterSpacing: 1.5 },
+  eyebrow: { color: Colors.cyan, fontWeight: '700', fontSize: 11, letterSpacing: 0.2 },
   title: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   artist: { color: Colors.textMuted, fontSize: 13 },
   iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21 },
   slider: { height: 16, marginTop: -14 },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   time: { color: Colors.textMuted, fontVariant: ['tabular-nums'], fontSize: 11 },
-  quality: { color: Colors.textMuted, fontWeight: '700', fontSize: 9, letterSpacing: 1.1 },
+  quality: { color: Colors.textMuted, fontWeight: '600', fontSize: 10, letterSpacing: 0.2 },
   controls: { marginTop: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   playButton: { borderRadius: 32 },
   playGradient: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },

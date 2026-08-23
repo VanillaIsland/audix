@@ -42,7 +42,7 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
         <View style={styles.sheet}>
           <View style={styles.grabber} />
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
-            <Text style={styles.eyebrow}>MODIFIER LES INFORMATIONS</Text>
+            <Text style={styles.eyebrow}>Modifier les informations</Text>
 
             <View style={styles.field}>
               <Text style={styles.label}>Titre</Text>
@@ -66,7 +66,7 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
               <View style={styles.danger}>
                 <Text style={styles.dangerText}>
                   {track.downloaded
-                    ? 'Le titre et son fichier hors ligne seront supprimés définitivement.'
+                    ? 'Le titre et le fichier gardé sur le téléphone seront supprimés définitivement.'
                     : 'Le titre sera retiré de ta bibliothèque et de tes playlists.'}
                 </Text>
                 <View style={styles.dangerRow}>
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   sheet: { maxHeight: '86%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: Colors.surface, paddingTop: 8 },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 6 },
   body: { padding: 18, gap: 14 },
-  eyebrow: { color: Colors.cyan, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
+  eyebrow: { color: Colors.cyan, fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
   field: { gap: 6 },
   label: { color: Colors.textMuted, fontSize: 10, fontWeight: '700' },
   input: { minHeight: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: Colors.surfaceRaised, color: Colors.text, fontSize: 14 },

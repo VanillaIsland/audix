@@ -57,8 +57,8 @@ export function GrabResults({ url, targetPlaylistName, onImport }: Props) {
     <View style={styles.card}>
       <View style={styles.head}>
         <View style={styles.headCopy}>
-          <Text style={styles.eyebrow}>ANALYSE DU LIEN</Text>
-          <Text style={styles.title}>Que contient ce transfert ?</Text>
+          <Text style={styles.eyebrow}>Analyse du lien</Text>
+          <Text style={styles.title}>Que contient ce lien ?</Text>
         </View>
         <Pressable
           disabled={!url.trim() || busy}
@@ -95,7 +95,7 @@ export function GrabResults({ url, targetPlaylistName, onImport }: Props) {
                 </View>
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowName} numberOfLines={2}>{file.name}</Text>
-                  <Text style={styles.rowMeta}>{formatSize(file.sizeBytes)} · {file.kind === 'audio' ? 'AUDIO' : 'VIDÉO'}</Text>
+                  <Text style={styles.rowMeta}>{formatSize(file.sizeBytes)} · {file.kind === 'audio' ? 'Audio' : 'Vidéo'}</Text>
                 </View>
 
                 {isDone ? (
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   card: { gap: 11, padding: 16, borderRadius: 20, backgroundColor: Colors.surface },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headCopy: { flex: 1, gap: 2 },
-  eyebrow: { color: Colors.purple, fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
+  eyebrow: { color: Colors.purple, fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
   title: { color: Colors.text, fontSize: 15, fontWeight: '900' },
   analyse: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, borderRadius: 13, backgroundColor: Colors.blue },
   analyseText: { color: Colors.text, fontSize: 11, fontWeight: '800' },

@@ -47,11 +47,11 @@ export function GrabPanel({
         </View>
         <View style={styles.heroCopy}>
           <View style={styles.eyebrowRow}>
-            <Text style={styles.eyebrow}>AUDIX INGEST ENGINE</Text>
-            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>READY</Text></View>
+            <Text style={styles.eyebrow}>Grab</Text>
+            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>Prêt</Text></View>
           </View>
-          <Text style={styles.title}>Grab your catalog</Text>
-          <Text style={styles.subtitle}>Colle une source, identifie son type et route-la vers ta bibliothèque ou une playlist.</Text>
+          <Text style={styles.title}>Récupère ton catalogue</Text>
+          <Text style={styles.subtitle}>Colle un lien : Audix reconnaît son type et l’envoie dans ta bibliothèque ou dans une playlist.</Text>
         </View>
       </View>
 
@@ -63,7 +63,7 @@ export function GrabPanel({
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          placeholder="URL d’un master direct ou d’une référence catalogue"
+          placeholder="Colle ici un lien de fichier ou de plateforme"
           placeholderTextColor="#50586F"
           style={styles.input}
         />
@@ -81,9 +81,9 @@ export function GrabPanel({
 
       <View style={styles.routeGrid}>
         <View style={styles.routeCard}>
-          <Text style={styles.routeLabel}>DESTINATION</Text>
+          <Text style={styles.routeLabel}>Destination</Text>
           <Text style={styles.routeTitle}>Bibliothèque Audix</Text>
-          <Text style={styles.routeCopy}>Le lien est ajouté à ton catalogue local. Tu peux aussi l’envoyer directement dans une playlist.</Text>
+          <Text style={styles.routeCopy}>Le lien rejoint ton catalogue local. Tu peux aussi le ranger tout de suite dans une playlist.</Text>
           {playlists.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.playlistChips}>
               <Pressable onPress={() => onChangeTargetPlaylist(null)} style={[styles.playlistChip, !targetPlaylistId && styles.playlistChipActive]}>
@@ -96,16 +96,16 @@ export function GrabPanel({
                 </Pressable>
               ))}
             </ScrollView>
-          ) : <Text style={styles.routeHint}>Crée une playlist pour activer le routage direct.</Text>}
+          ) : <Text style={styles.routeHint}>Crée une playlist pour pouvoir y envoyer le titre directement.</Text>}
         </View>
 
         <View style={styles.routeCard}>
-          <Text style={styles.routeLabel}>TYPE DE SOURCE</Text>
+          <Text style={styles.routeLabel}>Type de source</Text>
           <Text style={styles.routeTitle}>{url.trim() ? profile.label : 'En attente d’un lien'}</Text>
           <Text style={styles.routeCopy}>
             {isPlatform
-              ? 'Audix enregistre cette page comme référence de ton catalogue et l’ouvre via le lecteur officiel.'
-              : 'Un fichier direct audio/vidéo peut être lu dans Audix. Le hors-ligne est réservé aux builds mobiles.'}
+              ? 'Audix garde cette page comme référence de ton catalogue et l’ouvre avec le lecteur officiel.'
+              : 'Un fichier audio ou vidéo direct se lit dans Audix. Le hors ligne n’existe que sur les apps mobiles.'}
           </Text>
           {isPlatform && url.trim() ? (
             <Pressable style={styles.sourceLink} onPress={() => Linking.openURL(url.trim())}>
@@ -128,7 +128,7 @@ export function GrabPanel({
         </View>
         <View style={styles.rightsCopy}>
           <Text style={styles.rightsTitle}>Catalogue autorisé</Text>
-          <Text style={styles.rightsText}>Je confirme posséder les droits ou l’autorisation d’utiliser cette source dans Audix.</Text>
+          <Text style={styles.rightsText}>Je confirme que je possède les droits sur cette source, ou l’autorisation de l’utiliser.</Text>
         </View>
         <Ionicons name={rightsConfirmed ? 'shield-checkmark' : 'shield-outline'} size={22} color={rightsConfirmed ? Colors.success : Colors.textMuted} />
       </Pressable>
@@ -143,14 +143,14 @@ export function GrabPanel({
         {!isPlatform && Platform.OS !== 'web' ? (
           <Pressable disabled={!isReady} style={[styles.secondaryButton, !isReady && styles.disabled]} onPress={() => onSubmit(true)}>
             <Ionicons name="cloud-download-outline" size={19} color={Colors.cyan} />
-            <Text style={styles.secondaryText}>Lire & garder hors ligne</Text>
+            <Text style={styles.secondaryText}>Lire et garder hors ligne</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.policyBar}>
         <Ionicons name="information-circle-outline" size={18} color={Colors.success} />
-        <Text style={styles.policyText}>Les plateformes restent des références officielles. Audix ne contourne ni publicité, ni DRM, ni contrôle d’accès.</Text>
+        <Text style={styles.policyText}>Les liens de plateformes restent de simples références. Audix ne contourne ni publicité, ni DRM, ni contrôle d’accès.</Text>
       </View>
     </View>
   );
@@ -165,10 +165,10 @@ const styles = StyleSheet.create({
   iconGradient: { flex: 1, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   heroCopy: { flex: 1, gap: 4 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 9 },
-  eyebrow: { color: Colors.cyan, fontSize: 9, fontWeight: '900', letterSpacing: 1.8 },
+  eyebrow: { color: Colors.cyan, fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: '#0A211C' },
   liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.success },
-  liveText: { color: Colors.success, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  liveText: { color: Colors.success, fontSize: 9, fontWeight: '700', letterSpacing: 0.2 },
   title: { color: Colors.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   subtitle: { color: Colors.textMuted, fontSize: 12, lineHeight: 18 },
   inputShell: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, borderColor: '#2C354D', backgroundColor: '#070A10' },
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   detectTextDanger: { color: Colors.danger },
   routeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   routeCard: { flex: 1, minWidth: 260, gap: 6, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#20283B', backgroundColor: 'rgba(17,21,33,0.82)' },
-  routeLabel: { color: '#59647D', fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
+  routeLabel: { color: '#59647D', fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
   routeTitle: { color: Colors.text, fontSize: 15, fontWeight: '800' },
   routeCopy: { color: Colors.textMuted, fontSize: 10, lineHeight: 16 },
   routeHint: { color: '#59647D', fontSize: 9, marginTop: 4 },

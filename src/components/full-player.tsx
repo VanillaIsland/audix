@@ -36,9 +36,9 @@ export function FullPlayer({
             <Ionicons name="chevron-down" size={26} color={Colors.text} />
           </Pressable>
           <View style={styles.barCopy}>
-            <Text style={styles.eyebrow}>EN LECTURE</Text>
+            <Text style={styles.eyebrow}>En lecture</Text>
             <Text style={styles.queue} numberOfLines={1}>
-              {playback.queue.length > 1 ? `${playback.index + 1} sur ${playback.queue.length}` : 'Lecture simple'}
+              {playback.queue.length > 1 ? `${playback.index + 1} sur ${playback.queue.length}` : 'Un seul titre en file'}
             </Text>
           </View>
           <View style={styles.iconBtn} />

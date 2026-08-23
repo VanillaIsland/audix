@@ -16,9 +16,9 @@ export function ExternalPlayer({ track, onToggleFavorite }: { track: AudixTrack;
       <View style={styles.header}>
         <View style={[styles.platformDot, { backgroundColor: platform?.color ?? Colors.cyan }]} />
         <View style={styles.meta}>
-          <Text style={styles.eyebrow}>OFFICIAL EMBED · {platform?.label.toUpperCase() ?? 'WEB'}</Text>
+          <Text style={styles.eyebrow}>Lecteur officiel {platform?.label ?? 'web'}</Text>
           <Text style={styles.title} numberOfLines={1}>{track.title}</Text>
-          <Text style={styles.subtitle}>Lecture officielle intégrée · les règles de la plateforme restent actives</Text>
+          <Text style={styles.subtitle}>Lecture par le lecteur officiel de la plateforme, avec ses propres règles.</Text>
         </View>
         <Pressable onPress={() => onToggleFavorite(track.id)} style={styles.iconButton}><Ionicons name={track.favorite ? 'heart' : 'heart-outline'} size={21} color={track.favorite ? Colors.purple : Colors.textMuted} /></Pressable>
       </View>
@@ -30,7 +30,7 @@ export function ExternalPlayer({ track, onToggleFavorite }: { track: AudixTrack;
         style: { width: '100%', height: platform?.key === 'spotify' ? 352 : 360, border: 0, borderRadius: 20, background: '#050609' },
       }) : <View style={styles.unavailable}><Text style={styles.subtitle}>Cette URL ne fournit pas de lecteur embarqué.</Text></View>}
       <View style={styles.footer}>
-        <View style={styles.note}><Ionicons name="shield-checkmark-outline" size={17} color={Colors.success} /><Text style={styles.noteText}>Stream officiel : connexion, publicité et disponibilité dépendent de la plateforme.</Text></View>
+        <View style={styles.note}><Ionicons name="shield-checkmark-outline" size={17} color={Colors.success} /><Text style={styles.noteText}>La connexion, la publicité et la disponibilité dépendent de la plateforme.</Text></View>
         <Pressable style={styles.openButton} onPress={() => Linking.openURL(source)}><Ionicons name="open-outline" size={16} color={Colors.cyan} /><Text style={styles.openText}>Ouvrir la source</Text></Pressable>
       </View>
     </View>
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   platformDot: { width: 9, height: 48, borderRadius: 6 },
   meta: { flex: 1, gap: 3 },
-  eyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
+  eyebrow: { color: Colors.cyan, fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
   title: { color: Colors.text, fontSize: 19, fontWeight: '900' },
   subtitle: { color: Colors.textMuted, fontSize: 10, lineHeight: 15 },
   iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: '#111625' },
