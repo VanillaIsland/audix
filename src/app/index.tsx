@@ -6,12 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CatalogSearch } from '@/components/catalog-search';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FullPlayer } from '@/components/full-player';
 import { GrabPanel } from '@/components/grab-panel';
+import { GrabResults } from '@/components/grab-results';
 import { MiniPlayer } from '@/components/mini-player';
 import { Player } from '@/components/player';
 import { PlaylistsPanel } from '@/components/playlists-panel';
 import { TabBar, type TabItem } from '@/components/tab-bar';
 import { TrackActions } from '@/components/track-actions';
+import { YouTubeBrowser } from '@/components/youtube-browser';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { usePlayback } from '@/lib/playback';
@@ -76,6 +79,7 @@ export default function HomeScreen() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [deletePlaylist, setDeletePlaylist] = useState<AudixPlaylist | null>(null);
   const [actionTrack, setActionTrack] = useState<AudixTrack | null>(null);
+  const [playerOpen, setPlayerOpen] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
   const visibleTracks = useMemo(() => {
@@ -110,7 +114,7 @@ export default function HomeScreen() {
 
   const importFiles = async () => {
     try {
-      const count = await library.importFiles();
+      const count = await library.importFiles(grabPlaylistId);
       if (count) showNotice({ tone: 'success', text: `${count} média${count > 1 ? 's' : ''} ajouté${count > 1 ? 's' : ''} à la bibliothèque.` });
     } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' }); }
   };
@@ -131,6 +135,31 @@ export default function HomeScreen() {
     } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ce lien ne peut pas être ajouté.' }); }
     finally { setGrabBusy(false); }
   };
+
+  const saveFromBrowser = useCallback(async (result: { url: string; title: string }, favorite: boolean) => {
+    try {
+      const imported = await library.importUrl(result.url, false);
+      if (favorite) library.toggleFavorite(imported.id);
+      showNotice({ tone: 'success', text: favorite ? 'Ajouté aux favoris.' : 'Ajouté à la bibliothèque.' });
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ajout impossible.' });
+    }
+  }, [library]);
+
+  const importGrabFile = useCallback(async (file: { url: string; name: string }, keepOffline: boolean) => {
+    if (!rightsConfirmed) {
+      showNotice({ tone: 'danger', text: 'Active « Catalogue autorisé » avant l\u2019ajout.' });
+      throw new Error('rights');
+    }
+    try {
+      const imported = await library.importUrl(file.url, keepOffline);
+      if (grabPlaylistId) library.addTrackToPlaylist(grabPlaylistId, imported.id);
+      showNotice({ tone: 'success', text: keepOffline ? `${file.name} téléchargé et prêt hors ligne.` : `${file.name} ajouté à la bibliothèque.` });
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' });
+      throw error;
+    }
+  }, [grabPlaylistId, library, rightsConfirmed]);
 
   const addCatalogResult = async (url: string) => {
     try { await importLink(url); showNotice({ tone: 'success', text: 'Résultat YouTube ajouté au lecteur officiel Audix.' }); }
@@ -164,30 +193,44 @@ export default function HomeScreen() {
 
 
           {section === 'play' ? <View style={styles.sectionStack}>
-            <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
-            <CatalogSearch onAddLink={addCatalogResult} />
-            <View style={styles.quickActions}><Pressable style={styles.quickAction} onPress={importFiles}><View style={styles.quickIcon}><Ionicons name="folder-open-outline" size={20} color={Colors.cyan} /></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>Importer mes masters</Text><Text style={styles.quickText}>Audio et vidéo depuis ton appareil</Text></View><Ionicons name="arrow-forward" size={17} color={Colors.textMuted} /></Pressable><Pressable style={styles.quickAction} onPress={() => navigate('grab')}><View style={[styles.quickIcon, styles.quickIconPurple]}><Ionicons name="magnet-outline" size={20} color={Colors.purple} /></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>Grab une source</Text><Text style={styles.quickText}>Lien direct ou référence plateforme</Text></View><Ionicons name="arrow-forward" size={17} color={Colors.textMuted} /></Pressable></View>
+            {library.current && !library.current.externalUrl
+              ? <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
+              : null}
+            <YouTubeBrowser onSave={saveFromBrowser} />
           </View> : null}
 
           {section === 'grab' ? <GrabPanel url={grabUrl} onChangeUrl={setGrabUrl} rightsConfirmed={rightsConfirmed} onChangeRights={setRightsConfirmed} busy={grabBusy} playlists={library.playlists} targetPlaylistId={grabPlaylistId} onChangeTargetPlaylist={setGrabPlaylistId} onSubmit={grab} /> : null}
+          {section === 'grab' ? (
+            <GrabResults
+              url={grabUrl}
+              targetPlaylistName={library.playlists.find((p) => p.id === grabPlaylistId)?.name ?? null}
+              onImport={importGrabFile}
+            />
+          ) : null}
 
           {section === 'playlists' ? <PlaylistsPanel playlists={library.playlists} tracks={library.tracks} currentId={library.currentId} selectedId={selectedPlaylistId} onSelect={setSelectedPlaylistId} onCreate={library.createPlaylist} onUpdate={library.updatePlaylist} onToggleTrack={library.toggleTrackInPlaylist} onPlay={(id) => selectTrack(id, true)} onRequestDelete={setDeletePlaylist} onImport={importFiles} onGrab={() => { setGrabPlaylistId(selectedPlaylistId); setSection('grab'); }} /> : null}
 
           {section !== 'play' && section !== 'grab' && section !== 'playlists' ? <LibraryPanel title={currentSection.label} eyebrow={`${currentSection.caption.toUpperCase()} VAULT`} tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id, true)} onFavorite={library.toggleFavorite} onMore={setActionTrack} emptyIcon={section === 'favorites' ? 'heart-outline' : section === 'downloads' ? 'cloud-download-outline' : 'time-outline'} emptyTitle={section === 'favorites' ? 'Aucun favori signalé' : section === 'downloads' ? 'Le coffre offline est vide' : 'Aucune écoute récente'} onEmptyAction={() => navigate('grab')} /> : null}
 
-          {section === 'play' ? <LibraryPanel title="Bibliothèque" eyebrow="LOCAL-FIRST VAULT" tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id)} onFavorite={library.toggleFavorite} onMore={setActionTrack} emptyIcon="pulse-outline" emptyTitle="Ton univers audio attend son premier signal" onEmptyAction={() => navigate('grab')} /> : null}
 
           <View style={styles.footer}><Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.footerIcon} /><Text style={styles.footerBrand}>DA AUDIX · SMART AUDIO PLAYER · MVP 0.1</Text></View>
         </ScrollView>
       </SafeAreaView>
 
-      {section !== 'play' ? <MiniPlayer onOpen={() => setSection('play')} /> : null}
+      <MiniPlayer onOpen={() => setPlayerOpen(true)} />
       <TabBar
         items={TABS}
         active={(section === 'grab' ? 'play' : section) as Exclude<Section, 'grab'>}
         onChange={navigate}
       />
       {notice ? <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === 'danger' ? styles.noticeDanger : notice.tone === 'success' ? styles.noticeSuccess : styles.noticeInfo]}><Ionicons name={notice.tone === 'danger' ? 'alert-circle' : notice.tone === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={notice.tone === 'danger' ? Colors.danger : notice.tone === 'success' ? Colors.success : Colors.cyan} /><Text style={styles.noticeText}>{notice.text}</Text><Ionicons name="close" size={16} color={Colors.textMuted} /></Pressable> : null}
+      <FullPlayer
+        visible={playerOpen}
+        track={library.current}
+        onClose={() => setPlayerOpen(false)}
+        onImport={importFiles}
+        onToggleFavorite={library.toggleFavorite}
+      />
       <TrackActions
         track={actionTrack}
         onClose={() => setActionTrack(null)}

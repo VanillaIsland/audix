@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { supabase } from '@/lib/supabase';
+
 /**
  * External playback providers. Everything here is streaming through official
  * players: no download, no DRM handling, no ad filtering.
@@ -34,38 +36,70 @@ export type ProviderResult = {
   url: string;
 };
 
+type RawItem = {
+  id?: { videoId?: string } | string;
+  title?: string;
+  artist?: string;
+  thumbnail?: string | null;
+  url?: string;
+  snippet?: { title?: string; channelTitle?: string; thumbnails?: { medium?: { url?: string } } };
+};
+
+const normalise = (item: RawItem): ProviderResult | null => {
+  const id = typeof item.id === 'string' ? item.id : item.id?.videoId;
+  if (!id) return null;
+  return {
+    id,
+    title: item.title ?? item.snippet?.title ?? 'Sans titre',
+    artist: item.artist ?? item.snippet?.channelTitle ?? 'YouTube',
+    thumbnail: item.thumbnail ?? item.snippet?.thumbnails?.medium?.url ?? undefined,
+    url: item.url ?? `https://www.youtube.com/watch?v=${id}`,
+  };
+};
+
+/** True when the Supabase proxy can be used (works on every platform). */
+export const searchReady = () => Boolean(supabase) || youtubeReady();
+
 /**
- * One search costs 100 quota units of the 10 000 daily allowance — roughly a
- * hundred searches per day. Keep maxResults tight and avoid search-as-you-type.
+ * Searches via the Supabase Edge Function first: the key stays server-side, so
+ * one key serves iOS, Android and web. Falls back to a direct call when a local
+ * key is present — useful in development, but that path is iOS-restricted.
+ *
+ * One search costs 100 of the 10 000 daily quota units — about a hundred a day.
+ * Avoid search-as-you-type.
  */
 export async function searchYouTube(query: string, maxResults = 15): Promise<ProviderResult[]> {
-  if (!youtubeReady()) throw new Error('Clé API YouTube absente. Renseigne EXPO_PUBLIC_YOUTUBE_API_KEY.');
+  const term = query.trim();
+  if (!term) return [];
+
+  if (supabase) {
+    const { data, error } = await supabase.functions.invoke('youtube-search', {
+      body: { q: term, maxResults },
+    });
+    if (!error && data?.items) {
+      return (data.items as RawItem[]).map(normalise).filter(Boolean) as ProviderResult[];
+    }
+    if (!youtubeReady()) {
+      throw new Error(data?.error ?? error?.message ?? 'Recherche indisponible côté serveur.');
+    }
+  }
+
+  if (!youtubeReady()) throw new Error('Aucune source de recherche configurée.');
+
   const params = new URLSearchParams({
     part: 'snippet',
     type: 'video',
     videoEmbeddable: 'true',
     maxResults: String(maxResults),
-    q: query,
+    q: term,
     key: YOUTUBE_API_KEY,
   });
-
   const response = await fetch(`${YOUTUBE_SEARCH}?${params.toString()}`);
   if (response.status === 403) {
-    throw new Error('Quota YouTube dépassé ou clé restreinte. Réessaie demain ou vérifie les restrictions de la clé.');
+    throw new Error('Quota YouTube dépassé, ou clé restreinte à une autre plateforme.');
   }
   if (!response.ok) throw new Error(`Recherche YouTube indisponible (${response.status}).`);
 
-  const payload = (await response.json()) as {
-    items?: { id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; thumbnails?: { medium?: { url?: string } } } }[];
-  };
-
-  return (payload.items ?? [])
-    .filter((item) => item.id?.videoId)
-    .map((item) => ({
-      id: item.id!.videoId!,
-      title: item.snippet?.title ?? 'Sans titre',
-      artist: item.snippet?.channelTitle ?? 'YouTube',
-      thumbnail: item.snippet?.thumbnails?.medium?.url,
-      url: `https://www.youtube.com/watch?v=${item.id!.videoId!}`,
-    }));
+  const payload = (await response.json()) as { items?: RawItem[] };
+  return (payload.items ?? []).map(normalise).filter(Boolean) as ProviderResult[];
 }

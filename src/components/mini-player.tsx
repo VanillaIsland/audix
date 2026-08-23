@@ -20,8 +20,8 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
   const progress = playback.duration > 0 ? playback.currentTime / playback.duration : 0;
 
   return (
-    // 55 = hauteur de la barre d'onglets, pour que le mini player se pose dessus
-    <View style={[styles.wrap, { bottom: 55 + Math.max(insets.bottom, 10) + 8 }]}>
+    // Collé juste au-dessus de la barre d'onglets (55 = sa hauteur).
+    <View style={[styles.wrap, { bottom: 55 + Math.max(insets.bottom, 10) }]}>
       <View style={styles.progressTrack}>
         <LinearGradient
           colors={Gradients.brand}

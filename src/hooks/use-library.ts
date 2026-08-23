@@ -36,11 +36,20 @@ export function useLibrary() {
 
   const current = useMemo(() => tracks.find((track) => track.id === currentId) ?? null, [currentId, tracks]);
 
-  const importFiles = useCallback(async () => {
+  /** Import depuis le téléphone. Une playlist cible classe les titres à l'ajout. */
+  const importFiles = useCallback(async (playlistId?: string | null) => {
     const imported = await pickOwnedMedia();
     if (!imported.length) return 0;
     setTracks((existing) => [...imported, ...existing]);
     setCurrentId((value) => value ?? imported[0].id);
+    if (playlistId) {
+      const ids = imported.map((track) => track.id);
+      setPlaylists((existing) => existing.map((playlist) => (
+        playlist.id === playlistId
+          ? { ...playlist, trackIds: [...playlist.trackIds, ...ids.filter((id) => !playlist.trackIds.includes(id))], updatedAt: new Date().toISOString() }
+          : playlist
+      )));
+    }
     return imported.length;
   }, []);
 

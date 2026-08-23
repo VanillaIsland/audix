@@ -5,14 +5,14 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, Text
 
 import { Colors, Radius } from '@/constants/theme';
 import { PLATFORM_PROFILES, searchUrlFor } from '@/lib/platforms';
-import { searchYouTube, youtubeReady, type ProviderResult } from '@/lib/providers';
+import { searchReady, searchYouTube, type ProviderResult } from '@/lib/providers';
 
 export function CatalogSearch({ onAddLink }: { onAddLink: (url: string) => Promise<void> }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProviderResult[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const ready = youtubeReady();
+  const ready = searchReady();
 
   const run = async () => {
     const term = query.trim();
