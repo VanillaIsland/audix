@@ -72,6 +72,8 @@ export async function searchYouTube(query: string, maxResults = 15): Promise<Pro
   const term = query.trim();
   if (!term) return [];
 
+  // Le relais Supabase est le chemin normal : la clé reste côté serveur.
+  let relayReason = '';
   if (supabase) {
     const { data, error } = await supabase.functions.invoke('youtube-search', {
       body: { q: term, maxResults },
@@ -79,12 +81,19 @@ export async function searchYouTube(query: string, maxResults = 15): Promise<Pro
     if (!error && data?.items) {
       return (data.items as RawItem[]).map(normalise).filter(Boolean) as ProviderResult[];
     }
+    relayReason = data?.error ?? error?.message ?? 'réponse vide';
     if (!youtubeReady()) {
-      throw new Error(data?.error ?? error?.message ?? 'La recherche est indisponible côté serveur.');
+      throw new Error(`Le relais de recherche ne répond pas : ${relayReason}`);
     }
   }
 
-  if (!youtubeReady()) throw new Error('Aucune source de recherche n’est configurée.');
+  if (!youtubeReady()) {
+    throw new Error(
+      supabase
+        ? `Le relais de recherche ne répond pas : ${relayReason}`
+        : 'Aucune source de recherche n’est configurée. Vérifie EXPO_PUBLIC_SUPABASE_URL et EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY dans le build.',
+    );
+  }
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -97,6 +106,11 @@ export async function searchYouTube(query: string, maxResults = 15): Promise<Pro
   const response = await fetch(`${YOUTUBE_SEARCH}?${params.toString()}`);
   if (response.status === 403) {
     throw new Error('La recherche YouTube ne répond pas : quota dépassé, ou clé restreinte à une autre plateforme.');
+  }
+  if (response.status === 400) {
+    throw new Error(
+      `La clé YouTube embarquée dans ce build n’est pas valide.${relayReason ? ` Le relais avait échoué avant : ${relayReason}` : ''}`,
+    );
   }
   if (!response.ok) throw new Error(`Recherche YouTube indisponible (${response.status}).`);
 
