@@ -5,75 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { YouTubeSurface } from '@/components/youtube-surface';
 import { Colors, Radius } from '@/constants/theme';
 import { searchYouTube, type ProviderResult } from '@/lib/providers';
-// Ajoute au début du fichier, après les imports
-import { Colors, Radius } from '@/constants/theme';
-import { searchYouTube, type ProviderResult } from '@/lib/providers';
 
 type Props = {
   /** Ajoute la référence à la bibliothèque, éventuellement en favori. */
   onSave: (result: ProviderResult, favorite: boolean) => void;
-  /** Télécharge le média YouTube en MP3 et l'ajoute à la bibliothèque. */
+  /** Télécharge le média YouTube et l'ajoute à la bibliothèque hors ligne. */
   onDownload?: (result: ProviderResult) => Promise<void>;
-};
-
-// Dans renderRow, après le bouton "Ajouter à la bibliothèque"
-<View style={styles.rowActions}>
-  <Pressable
-    accessibilityLabel={`Lire ${item.title}`}
-    onPress={() => setPlaying(item)}
-    hitSlop={6}
-    style={[styles.playBtn, active && styles.playBtnOn]}>
-    <Ionicons name={active ? 'pause' : 'play'} size={17} color={Colors.text} />
-  </Pressable>
-  <Pressable
-    accessibilityLabel="Ajouter aux favoris"
-    onPress={() => onSave(item, true)}
-    hitSlop={6}
-    style={styles.iconBtn}>
-    <Ionicons name="heart-outline" size={18} color={Colors.purple} />
-  </Pressable>
-  <Pressable
-    accessibilityLabel="Ajouter à la bibliothèque"
-    onPress={() => onSave(item, false)}
-    hitSlop={6}
-    style={styles.iconBtn}>
-    <Ionicons name="add" size={20} color={Colors.cyan} />
-  </Pressable>
-  {/* NOUVEAU BOUTON: Télécharger */}
-  {onDownload && (
-    <Pressable
-      accessibilityLabel="Télécharger et ajouter hors ligne"
-      onPress={() => onDownload(item)}
-      hitSlop={6}
-      style={styles.iconBtn}>
-      <Ionicons name="cloud-download-outline" size={18} color={Colors.success} />
-    </Pressable>
-  )}
-</View>
-
-// Dans le Modal (plein écran), ajoute aussi le bouton après "Ajouter aux favoris"
-<Pressable
-  accessibilityLabel="Ajouter aux favoris"
-  onPress={() => playing && onSave(playing, true)}
-  hitSlop={10}
-  style={styles.iconBtn}>
-  <Ionicons name="heart-outline" size={21} color={Colors.purple} />
-</Pressable>
-{onDownload && playing && (
-  <Pressable
-    accessibilityLabel="Télécharger ce titre"
-    onPress={() => onDownload(playing)}
-    hitSlop={10}
-    style={styles.iconBtn}>
-    <Ionicons name="cloud-download-outline" size={21} color={Colors.success} />
-  </Pressable>
-)}
-
-type Props = {
-  /** Ajoute la référence à la bibliothèque, éventuellement en favori. */
-  onSave: (result: ProviderResult, favorite: boolean) => void;
-  /** Télécharge le média et l'ajoute à la bibliothèque (hors ligne). */
-  onDownload?: (result: ProviderResult) => void;
 };
 
 export function YouTubeBrowser({ onSave, onDownload }: Props) {
@@ -130,12 +67,7 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
           </Pressable>
           {/* NOUVEAU BOUTON : TÉLÉCHARGER */}
           {onDownload && (
-            <Pressable 
-              accessibilityLabel="Télécharger et ajouter hors ligne" 
-              onPress={() => onDownload(item)} 
-              hitSlop={6} 
-              style={styles.iconBtn}
-            >
+            <Pressable accessibilityLabel="Télécharger et ajouter hors ligne" onPress={() => onDownload(item)} hitSlop={6} style={styles.iconBtn}>
               <Ionicons name="cloud-download-outline" size={18} color={Colors.success} />
             </Pressable>
           )}
@@ -221,21 +153,12 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
             
             {/* NOUVEAU BOUTON : TÉLÉCHARGER (MODE PLEIN ÉCRAN) */}
             {onDownload && playing && (
-              <Pressable
-                accessibilityLabel="Télécharger ce titre"
-                onPress={() => onDownload(playing)}
-                hitSlop={10}
-                style={styles.iconBtn}
-              >
+              <Pressable accessibilityLabel="Télécharger ce titre" onPress={() => onDownload(playing)} hitSlop={10} style={styles.iconBtn}>
                 <Ionicons name="cloud-download-outline" size={21} color={Colors.success} />
               </Pressable>
             )}
 
-            <Pressable
-              accessibilityLabel="Ajouter aux favoris"
-              onPress={() => playing && onSave(playing, true)}
-              hitSlop={10}
-              style={styles.iconBtn}>
+            <Pressable accessibilityLabel="Ajouter aux favoris" onPress={() => playing && onSave(playing, true)} hitSlop={10} style={styles.iconBtn}>
               <Ionicons name="heart-outline" size={21} color={Colors.purple} />
             </Pressable>
           </View>
@@ -246,7 +169,6 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
   );
 }
 
-// ... (Le reste du StyleSheet reste inchangé, copie-le tel quel depuis ton fichier original)
 const styles = StyleSheet.create({
   screen: { flex: 1, gap: 10 },
   searchBar: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingLeft: 13, paddingRight: 6, borderRadius: 14, backgroundColor: Colors.surfaceRaised },
