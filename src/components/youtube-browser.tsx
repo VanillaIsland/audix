@@ -5,6 +5,69 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { YouTubeSurface } from '@/components/youtube-surface';
 import { Colors, Radius } from '@/constants/theme';
 import { searchYouTube, type ProviderResult } from '@/lib/providers';
+// Ajoute au début du fichier, après les imports
+import { Colors, Radius } from '@/constants/theme';
+import { searchYouTube, type ProviderResult } from '@/lib/providers';
+
+type Props = {
+  /** Ajoute la référence à la bibliothèque, éventuellement en favori. */
+  onSave: (result: ProviderResult, favorite: boolean) => void;
+  /** Télécharge le média YouTube en MP3 et l'ajoute à la bibliothèque. */
+  onDownload?: (result: ProviderResult) => Promise<void>;
+};
+
+// Dans renderRow, après le bouton "Ajouter à la bibliothèque"
+<View style={styles.rowActions}>
+  <Pressable
+    accessibilityLabel={`Lire ${item.title}`}
+    onPress={() => setPlaying(item)}
+    hitSlop={6}
+    style={[styles.playBtn, active && styles.playBtnOn]}>
+    <Ionicons name={active ? 'pause' : 'play'} size={17} color={Colors.text} />
+  </Pressable>
+  <Pressable
+    accessibilityLabel="Ajouter aux favoris"
+    onPress={() => onSave(item, true)}
+    hitSlop={6}
+    style={styles.iconBtn}>
+    <Ionicons name="heart-outline" size={18} color={Colors.purple} />
+  </Pressable>
+  <Pressable
+    accessibilityLabel="Ajouter à la bibliothèque"
+    onPress={() => onSave(item, false)}
+    hitSlop={6}
+    style={styles.iconBtn}>
+    <Ionicons name="add" size={20} color={Colors.cyan} />
+  </Pressable>
+  {/* NOUVEAU BOUTON: Télécharger */}
+  {onDownload && (
+    <Pressable
+      accessibilityLabel="Télécharger et ajouter hors ligne"
+      onPress={() => onDownload(item)}
+      hitSlop={6}
+      style={styles.iconBtn}>
+      <Ionicons name="cloud-download-outline" size={18} color={Colors.success} />
+    </Pressable>
+  )}
+</View>
+
+// Dans le Modal (plein écran), ajoute aussi le bouton après "Ajouter aux favoris"
+<Pressable
+  accessibilityLabel="Ajouter aux favoris"
+  onPress={() => playing && onSave(playing, true)}
+  hitSlop={10}
+  style={styles.iconBtn}>
+  <Ionicons name="heart-outline" size={21} color={Colors.purple} />
+</Pressable>
+{onDownload && playing && (
+  <Pressable
+    accessibilityLabel="Télécharger ce titre"
+    onPress={() => onDownload(playing)}
+    hitSlop={10}
+    style={styles.iconBtn}>
+    <Ionicons name="cloud-download-outline" size={21} color={Colors.success} />
+  </Pressable>
+)}
 
 type Props = {
   /** Ajoute la référence à la bibliothèque, éventuellement en favori. */
