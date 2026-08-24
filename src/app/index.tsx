@@ -1,11 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+export default function HomeScreen() {
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
+    try {
+      showNotice({ tone: 'info', text: 'Préparation du téléchargement...' });
+      
+      // Détection de la source pour un traitement spécifique si nécessaire
+      let source = 'unknown';
+      if (result.url.includes('youtube.com') || result.url.includes('youtu.be')) source = 'youtube';
+      else if (result.url.includes('facebook.com') || result.url.includes('fb.watch')) source = 'facebook';
+      else if (result.url.includes('spotify.com')) source = 'spotify';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+// On importe l'URL avec keepOffline = true pour forcer le téléchargement local
+      // La logique complexe (yt-dlp, etc.) peut être branchée dans library.importUrl 
+      // ou via un utilitaire dédié avant cet appel.
+      const imported = await library.importUrl(result.url, true);
+      
+      showNotice({ 
+        tone: 'success', 
+        text: `"${result.title}" est maintenant disponible hors ligne.` 
+      });
+    } catch (error) {
+      showNotice({ 
+        tone: 'danger', 
+        text: error instanceof Error ? error.message : 'Le téléchargement a échoué.' 
+      });
+    }
+  }, [library]);
 import { ConfirmDialog } from '@/components/confirm-dialog';
+// ... (garder le reste de tes fonctions : saveFromBrowser, importGrabFile, etc.)
+
+  return (
+    <View style={styles.screen}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+          {/* ... (garder toute la partie header/topbar) */}
+
+          {section === 'play' ? (
+            <View style={styles.sectionStack}>
+              {library.current && !library.current.externalUrl ? (
+                <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
+              ) : null}
+              
+              {/* MODIFICATION ICI : on passe la nouvelle prop onDownload */}
+              <YouTubeBrowser 
+                onSave={saveFromBrowser} 
+                onDownload={downloadFromBrowser} 
+              />
+            </View>
+          ) : null}
+          {     
 import { FullPlayer } from '@/components/full-player';
 import { GrabPanel } from '@/components/grab-panel';
 import { GrabResults } from '@/components/grab-results';
