@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { downloadAudioFile, getYouTubeAudioStream, sanitizeFilename } from '@/lib/youtube-downloader';
 import { LinearGradient } from 'expo-linear-gradient';
 export default function HomeScreen() {
 import { useRouter } from 'expo-router';
@@ -7,7 +8,56 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
       showNotice({ tone: 'info', text: 'Préparation du téléchargement...' });
-      
+    
+    // Extraire l'ID YouTube de l'URL
+    const urlMatch = result.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+    if (!urlMatch) {
+      throw new Error('URL YouTube invalide');
+    }
+    
+    const videoId = urlMatch[1];
+    
+    // Obtenir le stream audio direct (sans pub)
+    showNotice({ tone: 'info', text: 'Récupération du flux audio...' });
+    const { url: audioUrl, info } = await getYouTubeAudioStream(videoId);
+    
+    // Générer un nom de fichier
+    const filename = `${sanitizeFilename(info.title || result.title)}.mp3`;
+    
+    // Télécharger le fichier
+    showNotice({ tone: 'info', text: 'Téléchargement en cours...' });
+    const localUri = await downloadAudioFile(audioUrl, filename, (progress) => {
+      showNotice({ tone: 'info', text: `Téléchargement: ${Math.round(progress * 100)}%` });
+    });
+    
+    // Ajouter à la bibliothèque avec le fichier local
+    showNotice({ tone: 'info', text: 'Ajout à la bibliothèque...' });
+    const imported = await library.importLocalFile(localUri, {
+      title: info.title || result.title,
+      artist: info.artist || result.artist || 'Artiste inconnu',
+      downloaded: true,
+      origin: 'youtube-export',
+    });
+    
+    showNotice({ 
+      tone: 'success', 
+      text: `"${info.title}" téléchargé et ajouté à ta bibliothèque hors ligne.` 
+    });
+    
+  } catch (error) {
+    console.error('Erreur download YouTube:', error);
+    showNotice({ 
+      tone: 'danger', 
+      text: error instanceof Error ? error.message : 'Échec du téléchargement YouTube.' 
+    });
+  }
+}, [library]);
+
+// Mets à jour le YouTubeBrowser pour passer la nouvelle prop
+<YouTubeBrowser 
+  onSave={saveFromBrowser} 
+  onDownload={downloadFromYouTube} 
+/>    
       // Détection de la source pour un traitement spécifique si nécessaire
       let source = 'unknown';
       if (result.url.includes('youtube.com') || result.url.includes('youtu.be')) source = 'youtube';
