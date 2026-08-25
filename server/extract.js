@@ -8,6 +8,8 @@ const app = express();
 const OUT = path.join(__dirname, 'public');
 fs.mkdirSync(OUT, { recursive: true });
 
+const COOKIES = '/etc/secrets/cookies.txt';
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -28,21 +30,21 @@ app.get('/extract', async (req, res) => {
     }
   } catch (_) {}
 
-  // 2. Conversion locale yt-dlp
+  // 2. Conversion yt-dlp (client iOS anti-bot + cookies si présents)
   const file = path.join(OUT, `${id}.mp3`);
   if (!fs.existsSync(file)) {
+    const args = [
+      '-x', '--audio-format', 'mp3', '--audio-quality', '6',
+      '--no-playlist', '--js-runtimes', 'node',
+      '--extractor-args', 'youtube:player_client=ios,android,default',
+      '-o', path.join(OUT, `${id}.%(ext)s`),
+    ];
+    if (fs.existsSync(COOKIES)) args.push('--cookies', COOKIES);
+    args.push(`https://www.youtube.com/watch?v=${id}`);
+
     const result = await new Promise((resolve) => {
-      execFile(
-        'yt-dlp',
-        [
-          '-x', '--audio-format', 'mp3', '--audio-quality', '6',
-          '--no-playlist', '--js-runtimes', 'node',
-          '--extractor-args', 'youtube:player_client=default,android',
-          '-o', path.join(OUT, `${id}.%(ext)s`),
-          `https://www.youtube.com/watch?v=${id}`,
-        ],
-        { timeout: 240000 },
-        (err, stdout, stderr) => resolve({ ok: !err, stderr: String(stderr || (err && err.message) || '') })
+      execFile('yt-dlp', args, { timeout: 240000 }, (err, stdout, stderr) =>
+        resolve({ ok: !err, stderr: String(stderr || (err && err.message) || '') })
       );
     });
     console.log('yt-dlp stderr:', result.stderr);
