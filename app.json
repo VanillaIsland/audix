@@ -4,70 +4,54 @@
     "slug": "audix",
     "version": "0.2.0",
     "orientation": "portrait",
-    "icon": "./assets/brand/audix-app-icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "audix",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#050609",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
     "ios": {
+      "supportsTablet": false,
       "bundleIdentifier": "com.vanillaisland.audix",
-      "supportsTablet": true,
-      "config": {
-        "usesNonExemptEncryption": false
-      }
     },
     "android": {
-      "package": "com.vanillaisland.audix",
-      "versionCode": 1,
-      "icon": "./assets/brand/audix-app-icon.png",
+      "package": "ai.daaudix.app",
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
-        "foregroundImage": "./assets/brand/audix-app-icon.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "android.permission.POST_NOTIFICATIONS"
-      ]
+        "backgroundColor": "#05070D",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
+      }
     },
     "web": {
+      "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/brand/audix-app-icon.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
+      "expo-asset",
+      "expo-audio",
+      "expo-document-picker",
+      "expo-file-system",
+      "expo-font",
+      "expo-linking",
+      "expo-system-ui",
+      "expo-web-browser",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#000000",
-          "image": "./assets/brand/audix-app-icon.png",
-          "imageWidth": 180
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#05070D"
         }
-      ],
-      [
-        "expo-audio",
-        {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
-          "enableBackgroundPlayback": true,
-          "enableBackgroundRecording": false
-        }
-      ],
-      "expo-asset"
+      ]
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
-      "router": {},
+      "supabaseUrl": "https://bijrqoaagsvdspadrtkn.supabase.co",
+      "supabasePublishableKey": "sb_publishable_qRQqDfSBUxxAqgLNxMwdDw_mDGATg7v",
+      "downloadServer": "https://audix-ytdlp.onrender.com",
       "eas": {
         "projectId": "ed48510a-5690-4559-a498-8a74cec62f65"
-      },
-      "supabaseUrl": "https://bijrqoaagsvdspadrtkn.supabase.co",
-      "supabasePublishableKey": "sb_publishable_qRQqDfSBUxxAqgLNxMwdDw_mDGATg7v"
-    },
-    "owner": "da-audix"
+      }
+    }
   }
 }
