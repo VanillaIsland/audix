@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FullPlayer } from '@/components/full-player';
@@ -10,15 +10,15 @@ import { GrabPanel } from '@/components/grab-panel';
 import { GrabResults } from '@/components/grab-results';
 import { MiniPlayer } from '@/components/mini-player';
 import { Player } from '@/components/player';
-import { PlaylistPicker } from '@/components/playlist-picker';
 import { PlaylistsPanel } from '@/components/playlists-panel';
 import { TabBar, type TabItem } from '@/components/tab-bar';
 import { TrackActions } from '@/components/track-actions';
 import { YouTubeBrowser } from '@/components/youtube-browser';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
+import { downloadYouTubeAudio } from '@/lib/downloader';
 import { usePlayback } from '@/lib/playback';
-import type { ProviderResult } from '@/lib/providers';
+import { searchYouTube, type ProviderResult } from '@/lib/providers';
 import type { MediaOrigin, AudixPlaylist, AudixTrack } from '@/types/media';
 
 type Section = 'play' | 'recent' | 'downloads' | 'favorites' | 'playlists' | 'grab';
@@ -47,46 +47,31 @@ const ORIGIN_LABELS: Record<MediaOrigin, string> = {
 
 const sizeLabel = (bytes?: number) => !bytes ? 'En ligne' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.round(bytes / 1_000)} Ko`;
 
-/**
- * Même ligne que dans l'onglet Lecture : vignette à gauche, artiste au-dessus,
- * titre en dessous, actions à droite. Les listes de l'app sont ainsi cohérentes.
- */
+void searchYouTube;
+
 function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
   return (
     <View style={[styles.trackRow, active && styles.trackRowActive]}>
-      <Pressable onPress={onSelect} style={styles.trackThumb}>
-        {track.thumbnail ? (
-          <Image source={{ uri: track.thumbnail }} style={styles.trackThumbImage} />
-        ) : (
-          <LinearGradient colors={active ? Gradients.brand : ['#1A2030', '#101521', '#0B0F18']} style={styles.trackThumbFallback}>
-            <Ionicons name={track.externalUrl ? 'radio-outline' : track.kind === 'audio' ? 'musical-note' : 'videocam'} size={20} color={Colors.text} />
-          </LinearGradient>
-        )}
-        {track.downloaded ? (
-          <View style={styles.trackThumbBadge}>
-            <Ionicons name="checkmark" size={11} color={Colors.text} />
-          </View>
-        ) : null}
+      <Pressable onPress={onSelect} style={styles.trackMain}>
+        <LinearGradient colors={active ? Gradients.brand : ['#1A2030', '#101521', '#0B0F18']} style={styles.trackIcon}>
+          <Ionicons name={track.externalUrl ? 'radio-outline' : track.kind === 'audio' ? 'musical-note' : 'videocam'} size={20} color={Colors.text} />
+        </LinearGradient>
+        <View style={styles.trackMeta}>
+          <Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text>
+          <Text style={styles.trackArtist} numberOfLines={1}>{track.artist} · {sizeLabel(track.size)}</Text>
+        </View>
       </Pressable>
-
-      <Pressable onPress={onSelect} style={styles.trackCopy}>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {track.artist} · {ORIGIN_LABELS[track.origin]} · {sizeLabel(track.size)}
-        </Text>
-        <Text style={styles.trackTitle} numberOfLines={2}>{track.title}</Text>
+      <View style={styles.sourceBadge}><Text style={styles.sourceText}>{ORIGIN_LABELS[track.origin]}</Text></View>
+      {track.downloaded ? <Ionicons name="checkmark-circle" color={Colors.success} size={17} /> : null}
+      <Pressable accessibilityLabel={track.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={onFavorite} hitSlop={10} style={styles.rowIconButton}>
+        <Ionicons name={track.favorite ? 'heart' : 'heart-outline'} color={track.favorite ? Colors.purple : Colors.textMuted} size={20} />
       </Pressable>
-
-      <View style={styles.trackActions}>
-        <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={onSelect} hitSlop={6} style={[styles.trackPlay, active && styles.trackPlayOn]}>
-          <Ionicons name={active ? 'volume-high' : 'play'} size={17} color={Colors.text} />
-        </Pressable>
-        <Pressable accessibilityLabel={track.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={onFavorite} hitSlop={6} style={styles.rowIconButton}>
-          <Ionicons name={track.favorite ? 'heart' : 'heart-outline'} color={track.favorite ? Colors.purple : Colors.textMuted} size={18} />
-        </Pressable>
-        <Pressable accessibilityLabel={`Actions pour ${track.title}`} onPress={onMore} hitSlop={6} style={styles.rowIconButton}>
-          <Ionicons name="ellipsis-horizontal" color={Colors.textMuted} size={18} />
-        </Pressable>
-      </View>
+      <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={onSelect} hitSlop={8} style={styles.rowIconButton}>
+        <Ionicons name={active ? 'volume-high' : 'play'} color={Colors.cyan} size={19} />
+      </Pressable>
+      <Pressable accessibilityLabel={`Actions pour ${track.title}`} onPress={onMore} hitSlop={8} style={styles.rowIconButton}>
+        <Ionicons name="ellipsis-horizontal" color={Colors.textMuted} size={19} />
+      </Pressable>
     </View>
   );
 }
@@ -117,6 +102,7 @@ export default function HomeScreen() {
   const playback = usePlayback();
   const [section, setSection] = useState<Section>('play');
   const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [grabUrl, setGrabUrl] = useState('');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [grabBusy, setGrabBusy] = useState(false);
@@ -126,7 +112,9 @@ export default function HomeScreen() {
   const [actionTrack, setActionTrack] = useState<AudixTrack | null>(null);
   const [playerOpen, setPlayerOpen] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  const [pickerResult, setPickerResult] = useState<ProviderResult | null>(null);
+  const [pickerFor, setPickerFor] = useState<ProviderResult | null>(null);
+  const [newPlOpen, setNewPlOpen] = useState(false);
+  const [newPlName, setNewPlName] = useState('');
 
   const visibleTracks = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -182,11 +170,7 @@ export default function HomeScreen() {
 
   const saveFromBrowser = useCallback(async (result: ProviderResult, favorite: boolean) => {
     try {
-      const imported = await library.importUrl(result.url, false, {
-        title: result.title,
-        artist: result.artist,
-        thumbnail: result.thumbnail,
-      });
+      const imported = await library.importUrl(result.url, false);
       if (favorite) library.toggleFavorite(imported.id);
       showNotice({ tone: 'success', text: favorite ? 'Ajouté aux favoris.' : 'Ajouté à la bibliothèque.' });
     } catch (error) {
@@ -194,46 +178,56 @@ export default function HomeScreen() {
     }
   }, [library]);
 
-  // NOUVELLE FONCTION : Téléchargement depuis le navigateur YouTube
-  const downloadFromYouTube = useCallback(async (result: ProviderResult) => {
+  // VRAI TÉLÉCHARGEMENT MP3 via le serveur yt-dlp, puis playlist auto « Downloaded »
+  const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
-      showNotice({ tone: 'info', text: 'Préparation du téléchargement...' });
-      // On force keepOffline à true pour déclencher le téléchargement local
-      const imported = await library.importUrl(result.url, true, {
-        title: result.title,
-        artist: result.artist,
-        thumbnail: result.thumbnail,
-      });
-      // Tout ce qui est téléchargé se retrouve dans une playlist « Downloaded ».
-      const existing = library.playlists.find((playlist) => playlist.name.toLowerCase() === 'downloaded');
-      const downloaded = existing ?? library.createPlaylist('Downloaded');
-      library.addTrackToPlaylist(downloaded.id, imported.id);
-      showNotice({ tone: 'success', text: `« ${result.title} » est hors ligne, dans la playlist Downloaded.` });
+      showNotice({ tone: 'info', text: 'Conversion MP3 en cours… (peut prendre 1 minute)' });
+      const direct = await downloadYouTubeAudio(result.id);
+      const imported = await library.importUrl(direct.url, true);
+      library.updateTrack(imported.id, { title: result.title, artist: result.artist });
+      const downloaded = library.playlists.find((p) => p.name.toLowerCase() === 'downloaded');
+      if (downloaded) library.addTrackToPlaylist(downloaded.id, imported.id);
+      showNotice({ tone: 'success', text: `« ${result.title} » téléchargé en MP3 et dispo hors ligne.` });
     } catch (error) {
-      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Échec du téléchargement.' });
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Téléchargement impossible.' });
     }
   }, [library]);
 
-  /** Ajout depuis le navigateur, avec rangement immediat dans une playlist. */
-  const addFromBrowser = useCallback(async (result: ProviderResult, playlistId: string | null, newName?: string) => {
+  const addToPlaylistFromBrowser = useCallback((result: ProviderResult) => {
+    setNewPlOpen(false);
+    setNewPlName('');
+    setPickerFor(result);
+  }, []);
+
+  const addToPlaylist = async (result: ProviderResult, playlistId: string) => {
     try {
-      const imported = await library.importUrl(result.url, false, {
-        title: result.title,
-        artist: result.artist,
-        thumbnail: result.thumbnail,
-      });
-      let target = playlistId;
-      if (newName) {
-        const created = library.createPlaylist(newName);
-        target = created.id;
-      }
-      if (target) library.addTrackToPlaylist(target, imported.id);
-      const name = newName ?? library.playlists.find((playlist) => playlist.id === target)?.name;
-      showNotice({ tone: 'success', text: name ? `« ${result.title} » ajouté à ${name}.` : `« ${result.title} » ajouté à la bibliothèque.` });
+      const imported = await library.importUrl(result.url, false);
+      library.addTrackToPlaylist(playlistId, imported.id);
+      const name = library.playlists.find((p) => p.id === playlistId)?.name ?? 'playlist';
+      showNotice({ tone: 'success', text: `« ${result.title} » ajouté à « ${name} ».` });
+      setPickerFor(null);
     } catch (error) {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ajout impossible.' });
     }
-  }, [library]);
+  };
+
+  const createAndAdd = async () => {
+    const name = newPlName.trim();
+    if (!name || !pickerFor) return;
+    try {
+      await library.createPlaylist(name);
+      const created = library.playlists.find((p) => p.name === name);
+      if (created) {
+        await addToPlaylist(pickerFor, created.id);
+      } else {
+        showNotice({ tone: 'info', text: 'Playlist créée. Rouvre le choix pour y ajouter le titre.' });
+      }
+      setNewPlOpen(false);
+      setNewPlName('');
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Création impossible.' });
+    }
+  };
 
   const importGrabFile = useCallback(async (file: { url: string; name: string }, keepOffline: boolean) => {
     if (!rightsConfirmed) {
@@ -249,6 +243,12 @@ export default function HomeScreen() {
       throw error;
     }
   }, [grabPlaylistId, library, rightsConfirmed]);
+
+  const addCatalogResult = async (url: string) => {
+    try { await importLink(url); showNotice({ tone: 'success', text: 'Résultat YouTube ajouté au lecteur officiel Audix.' }); }
+    catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ajout impossible.' }); }
+  };
+  void addCatalogResult;
 
   const currentSection = SECTIONS.find((item) => item.key === section) ?? SECTIONS[0];
 
@@ -277,8 +277,13 @@ export default function HomeScreen() {
               {library.current && !library.current.externalUrl ? (
                 <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
               ) : null}
-              {/* MODIFICATION ICI : on passe la prop onDownload */}
-              <YouTubeBrowser onSave={saveFromBrowser} onDownload={downloadFromYouTube} onAddToPlaylist={setPickerResult} />
+              <YouTubeBrowser
+                onSave={saveFromBrowser}
+                onDownload={downloadFromBrowser}
+                onAddToPlaylist={addToPlaylistFromBrowser}
+                savedQuery={searchQuery}
+                onQueryChange={setSearchQuery}
+              />
             </View>
           ) : null}
 
@@ -305,7 +310,7 @@ export default function HomeScreen() {
 
       <MiniPlayer onOpen={() => setPlayerOpen(true)} />
       <TabBar items={TABS} active={(section === 'grab' ? 'play' : section) as Exclude<Section, 'grab'>} onChange={navigate} />
-      
+
       {notice ? (
         <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === 'danger' ? styles.noticeDanger : notice.tone === 'success' ? styles.noticeSuccess : styles.noticeInfo]}>
           <Ionicons name={notice.tone === 'danger' ? 'alert-circle' : notice.tone === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={notice.tone === 'danger' ? Colors.danger : notice.tone === 'success' ? Colors.success : Colors.cyan} />
@@ -315,25 +320,13 @@ export default function HomeScreen() {
       ) : null}
 
       <FullPlayer visible={playerOpen} track={library.current} onClose={() => setPlayerOpen(false)} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
-      
+
       <TrackActions
         track={actionTrack}
         onClose={() => setActionTrack(null)}
         onSave={(id, changes) => { library.updateTrack(id, changes); showNotice({ tone: 'success', text: 'Informations mises à jour.' }); }}
         onDelete={(id) => { library.deleteTrack(id).catch(() => undefined); showNotice({ tone: 'success', text: 'Titre supprimé de la bibliothèque.' }); }}
         onToggleFavorite={(id) => { library.toggleFavorite(id); setActionTrack((t) => (t ? { ...t, favorite: !t.favorite } : t)); }}
-      />
-      
-      <PlaylistPicker
-        visible={Boolean(pickerResult)}
-        trackTitle={pickerResult?.title ?? ''}
-        playlists={library.playlists}
-        onCancel={() => setPickerResult(null)}
-        onConfirm={(playlistId, newName) => {
-          const target = pickerResult;
-          setPickerResult(null);
-          if (target) addFromBrowser(target, playlistId, newName).catch(() => undefined);
-        }}
       />
 
       <ConfirmDialog
@@ -343,6 +336,37 @@ export default function HomeScreen() {
         onCancel={() => setDeletePlaylist(null)}
         onConfirm={() => { if (deletePlaylist) library.deletePlaylist(deletePlaylist.id); setSelectedPlaylistId(null); setDeletePlaylist(null); showNotice({ tone: 'success', text: 'Playlist supprimée. Tes médias sont intacts.' }); }}
       />
+
+      <Modal visible={Boolean(pickerFor)} transparent animationType="fade" onRequestClose={() => setPickerFor(null)}>
+        <View style={styles.pickerBackdrop}>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Ajouter à une playlist</Text>
+            <Text style={styles.pickerSub} numberOfLines={1}>{pickerFor?.title}</Text>
+            {library.playlists.map((pl) => (
+              <Pressable key={pl.id} style={styles.pickerRow} onPress={() => pickerFor && addToPlaylist(pickerFor, pl.id)}>
+                <Ionicons name="albums-outline" size={18} color={Colors.cyan} />
+                <Text style={styles.pickerRowText} numberOfLines={1}>{pl.name}</Text>
+              </Pressable>
+            ))}
+            {newPlOpen ? (
+              <View style={styles.pickerNewRow}>
+                <TextInput value={newPlName} onChangeText={setNewPlName} placeholder="Nom de la playlist" placeholderTextColor="#50586F" style={styles.pickerInput} />
+                <Pressable style={styles.pickerGo} onPress={() => createAndAdd()}>
+                  <Ionicons name="checkmark" size={16} color={Colors.text} />
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={styles.pickerRow} onPress={() => setNewPlOpen(true)}>
+                <Ionicons name="add-circle-outline" size={18} color={Colors.purple} />
+                <Text style={styles.pickerRowText}>Nouvelle playlist…</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.pickerClose} onPress={() => setPickerFor(null)}>
+              <Text style={styles.pickerCloseText}>Fermer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -376,56 +400,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden', backgroundColor: Colors.background },
   safeArea: { flex: 1 },
   page: { width: '100%', maxWidth: 1180, alignSelf: 'center', gap: 20, paddingHorizontal: 18, paddingBottom: 24 },
-  gridBackdrop: { position: 'absolute', inset: 0, flexDirection: 'row', justifyContent: 'space-around', opacity: 0.22 },
-  gridLine: { width: 1, height: '100%', backgroundColor: '#141A28' },
-  orbPurple: { position: 'absolute', width: 520, height: 520, borderRadius: 260, top: -280, left: -300, backgroundColor: 'rgba(167,27,255,0.11)' },
-  orbBlue: { position: 'absolute', width: 400, height: 400, borderRadius: 200, top: 300, left: '38%', backgroundColor: 'rgba(36,107,255,0.045)' },
-  orbCyan: { position: 'absolute', width: 460, height: 460, borderRadius: 230, top: 70, right: -330, backgroundColor: 'rgba(0,216,232,0.09)' },
   topbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
   topbarCopy: { flex: 1, minWidth: 0 },
   topbarTitle: { color: Colors.text, fontSize: 20, fontWeight: '800' },
   topbarMeta: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
   headerAction: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   headerActionOn: { borderColor: Colors.cyan, backgroundColor: '#0B2630' },
-  brandBlock: { width: '100%', alignItems: 'center', justifyContent: 'center', gap: 9 },
   wordmark: { width: 40, height: 40, borderRadius: 12 },
-  versionPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 15, paddingVertical: 9, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#263047', backgroundColor: '#0B0F18' },
-  versionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success },
-  versionText: { color: Colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 1.3, textAlign: 'center' },
-  topStats: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  topStat: { minWidth: 66, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 15, backgroundColor: '#0B0F18' },
-  topStatValue: { color: Colors.text, fontSize: 15, fontWeight: '900' },
-  topStatLabel: { color: Colors.textMuted, fontSize: 7, fontWeight: '900', letterSpacing: 1 },
-  privateBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 9, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#245346', backgroundColor: '#091B17' },
-  privateText: { color: Colors.success, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
-  heroBand: { minHeight: 140, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 22, padding: 23, borderRadius: 30, borderWidth: 1, borderColor: '#242C40', backgroundColor: 'rgba(10,13,21,0.86)' },
-  heroCopy: { flex: 1, minWidth: 280, alignItems: 'center', gap: 5 },
-  heroEyebrow: { color: Colors.cyan, fontSize: 8, fontWeight: '900', letterSpacing: 2.2, textAlign: 'center' },
-  heroTitle: { color: Colors.text, fontSize: 34, lineHeight: 39, fontWeight: '900', letterSpacing: -1.1, textAlign: 'center' },
-  heroAccent: { color: Colors.purple },
-  heroText: { width: '100%', maxWidth: 620, color: Colors.textMuted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
-  heroWave: { height: 92, minWidth: 260, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 15 },
-  heroBar: { width: 6, borderRadius: 6 },
-  nav: { gap: 9, paddingVertical: 1 },
-  navItem: { position: 'relative', minWidth: 145, minHeight: 61, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: '#252D41', backgroundColor: 'rgba(11,15,24,0.91)' },
-  navItemActive: { borderColor: '#31516B', backgroundColor: '#101925' },
-  navSignal: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 3 },
-  navIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#121725' },
-  navIconActive: { backgroundColor: '#0B2630' },
-  navText: { color: Colors.textMuted, fontSize: 11, fontWeight: '800' },
-  navTextActive: { color: Colors.text },
-  navCaption: { color: '#4F586F', fontSize: 7, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
-  sectionMarker: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sectionMarkerLine: { flex: 1, height: 1, backgroundColor: '#1B2233' },
-  sectionMarkerText: { color: '#566078', fontSize: 7, fontWeight: '900', letterSpacing: 1.8 },
   sectionStack: { gap: 16 },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  quickAction: { flex: 1, minWidth: 240, minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 11, borderRadius: 16, backgroundColor: Colors.surface },
-  quickIcon: { width: 43, height: 43, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#0B202A' },
-  quickIconPurple: { backgroundColor: '#21102F' },
-  quickCopy: { flex: 1, gap: 2 },
-  quickTitle: { color: Colors.text, fontSize: 11, fontWeight: '900' },
-  quickText: { color: Colors.textMuted, fontSize: 8 },
   librarySection: { gap: 10, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   libraryHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 3 },
   libraryEyebrow: { color: Colors.cyan, fontSize: 10, fontWeight: '700', letterSpacing: 0.2 },
@@ -433,21 +415,13 @@ const styles = StyleSheet.create({
   librarySubtitle: { color: Colors.textMuted, fontSize: 9, marginTop: 2 },
   searchBox: { width: 230, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#283149', backgroundColor: '#080B12' },
   searchInput: { flex: 1, height: 40, color: Colors.text, fontSize: 10 },
-  trackThumb: { width: 96, height: 54, borderRadius: 9, overflow: 'hidden', backgroundColor: Colors.surfaceRaised },
-  trackThumbImage: { width: '100%', height: '100%' },
-  trackThumbFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  trackThumbBadge: { position: 'absolute', right: 4, bottom: 4, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.65)' },
-  trackCopy: { flex: 1, minWidth: 0, gap: 2 },
-  trackActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  trackPlay: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: Colors.blue },
-  trackPlayOn: { backgroundColor: Colors.purple },
-  trackRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 14, backgroundColor: Colors.surfaceRaised },
+  trackRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 8, borderRadius: 14, backgroundColor: Colors.surfaceRaised },
   trackRowActive: { backgroundColor: '#12233A' },
   trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   trackIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   trackMeta: { flex: 1, minWidth: 0 },
-  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '800', lineHeight: 16 },
-  trackArtist: { color: Colors.textMuted, fontSize: 9, fontWeight: '800' },
+  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '900' },
+  trackArtist: { color: Colors.textMuted, fontSize: 9, marginTop: 3 },
   sourceBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: '#121827' },
   sourceText: { color: Colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.2 },
   rowIconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
@@ -467,4 +441,15 @@ const styles = StyleSheet.create({
   noticeDanger: { borderColor: '#5C2737', backgroundColor: '#241019' },
   noticeInfo: { borderColor: '#27566A', backgroundColor: '#0B1E27' },
   noticeText: { flex: 1, color: Colors.text, fontSize: 10, lineHeight: 15, fontWeight: '700' },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  pickerCard: { width: '100%', maxWidth: 420, gap: 8, padding: 16, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  pickerTitle: { color: Colors.text, fontSize: 15, fontWeight: '900' },
+  pickerSub: { color: Colors.textMuted, fontSize: 10, marginBottom: 4 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: Colors.surfaceRaised },
+  pickerRowText: { flex: 1, color: Colors.text, fontSize: 12, fontWeight: '800' },
+  pickerNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pickerInput: { flex: 1, height: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: Colors.surfaceRaised, color: Colors.text, fontSize: 12 },
+  pickerGo: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: Colors.blue },
+  pickerClose: { alignItems: 'center', paddingVertical: 10 },
+  pickerCloseText: { color: Colors.textMuted, fontSize: 11, fontWeight: '800' },
 });
