@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { YouTubeSurface } from '@/components/youtube-surface';
@@ -11,20 +11,44 @@ type Props = {
   onSave: (result: ProviderResult, favorite: boolean) => void;
   /** Télécharge le média YouTube et l'ajoute à la bibliothèque hors ligne. */
   onDownload?: (result: ProviderResult) => Promise<void>;
+  /** Ajoute à une playlist spécifique */
+  onAddToPlaylist?: (result: ProviderResult, playlistId: string) => void;
+  /** État de recherche persistant */
+  savedQuery?: string;
+  onQueryChange?: (query: string) => void;
 };
 
-export function YouTubeBrowser({ onSave, onDownload }: Props) {
+export function YouTubeBrowser({ 
+  onSave, 
+  onDownload, 
+  onAddToPlaylist,
+  savedQuery = '',
+  onQueryChange 
+}: Props) {
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(savedQuery);
   const [results, setResults] = useState<ProviderResult[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [playing, setPlaying] = useState<ProviderResult | null>(null);
   const [expanded, setExpanded] = useState(false);
 
+  // Sync avec savedQuery externe
+  useEffect(() => {
+    if (savedQuery !== query) {
+      setQuery(savedQuery);
+    }
+  }, [savedQuery]);
+
   const run = useCallback(async () => {
     const term = query.trim();
     if (!term) return;
+    
+    // Sauvegarder la query
+    if (onQueryChange) {
+      onQueryChange(term);
+    }
+    
     setBusy(true);
     setMessage('');
     try {
@@ -37,7 +61,15 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [query]);
+  }, [query, onQueryChange]);
+
+  const handleAddToPlaylist = useCallback((result: ProviderResult) => {
+    if (onAddToPlaylist) {
+      // Ouvrir un modal pour choisir la playlist
+      // Pour l'instant, on ajoute à la playlist par défaut
+      onAddToPlaylist(result, 'default');
+    }
+  }, [onAddToPlaylist]);
 
   const renderRow = useCallback(({ item }: { item: ProviderResult }) => {
     const active = playing?.id === item.id;
@@ -56,25 +88,54 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
           <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
         </Pressable>
         <View style={styles.rowActions}>
-          <Pressable accessibilityLabel={`Lire ${item.title}`} onPress={() => setPlaying(item)} hitSlop={6} style={[styles.playBtn, active && styles.playBtnOn]}>
+          <Pressable 
+            accessibilityLabel={`Lire ${item.title}`} 
+            onPress={() => setPlaying(item)} 
+            hitSlop={6} 
+            style={[styles.playBtn, active && styles.playBtnOn]}
+          >
             <Ionicons name={active ? 'pause' : 'play'} size={17} color={Colors.text} />
           </Pressable>
-          <Pressable accessibilityLabel="Ajouter aux favoris" onPress={() => onSave(item, true)} hitSlop={6} style={styles.iconBtn}>
+          <Pressable 
+            accessibilityLabel="Ajouter aux favoris" 
+            onPress={() => onSave(item, true)} 
+            hitSlop={6} 
+            style={styles.iconBtn}
+          >
             <Ionicons name="heart-outline" size={18} color={Colors.purple} />
           </Pressable>
-          <Pressable accessibilityLabel="Ajouter à la bibliothèque" onPress={() => onSave(item, false)} hitSlop={6} style={styles.iconBtn}>
+          <Pressable 
+            accessibilityLabel="Ajouter à la bibliothèque" 
+            onPress={() => onSave(item, false)} 
+            hitSlop={6} 
+            style={styles.iconBtn}
+          >
             <Ionicons name="add" size={20} color={Colors.cyan} />
           </Pressable>
-          {/* NOUVEAU BOUTON : TÉLÉCHARGER */}
+          {onAddToPlaylist && (
+            <Pressable 
+              accessibilityLabel="Ajouter à une playlist" 
+              onPress={() => handleAddToPlaylist(item)} 
+              hitSlop={6} 
+              style={styles.iconBtn}
+            >
+              <Ionicons name="albums-outline" size={18} color={Colors.blue} />
+            </Pressable>
+          )}
           {onDownload && (
-            <Pressable accessibilityLabel="Télécharger et ajouter hors ligne" onPress={() => onDownload(item)} hitSlop={6} style={styles.iconBtn}>
+            <Pressable 
+              accessibilityLabel="Télécharger et ajouter hors ligne" 
+              onPress={() => onDownload(item)} 
+              hitSlop={6} 
+              style={styles.iconBtn}
+            >
               <Ionicons name="cloud-download-outline" size={18} color={Colors.success} />
             </Pressable>
           )}
         </View>
       </View>
     );
-  }, [onSave, onDownload, playing?.id]);
+  }, [onSave, onDownload, onAddToPlaylist, handleAddToPlaylist, playing?.id]);
 
   return (
     <View style={styles.screen}>
@@ -82,7 +143,10 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
         <Ionicons name="search" size={17} color={Colors.textMuted} />
         <TextInput
           value={query}
-          onChangeText={setQuery}
+          onChangeText={(text) => {
+            setQuery(text);
+            if (onQueryChange) onQueryChange(text);
+          }}
           onSubmitEditing={run}
           placeholder="Rechercher un titre, un artiste…"
           placeholderTextColor="#50586F"
@@ -91,7 +155,12 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
           autoCorrect={false}
         />
         {query ? (
-          <Pressable onPress={() => { setQuery(''); setResults([]); setMessage(''); }} hitSlop={8}>
+          <Pressable onPress={() => { 
+            setQuery(''); 
+            setResults([]); 
+            setMessage('');
+            if (onQueryChange) onQueryChange('');
+          }} hitSlop={8}>
             <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
           </Pressable>
         ) : null}
@@ -106,7 +175,7 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
           <View style={styles.miniCopy}>
             <Text style={styles.miniArtist} numberOfLines={1}>{playing.artist}</Text>
             <Text style={styles.miniTitle} numberOfLines={2}>{playing.title}</Text>
-            <Text style={styles.miniHint}>Appuie sur la vidéo pour l’agrandir</Text>
+            <Text style={styles.miniHint}>Appuie sur la vidéo pour l'agrandir</Text>
           </View>
           <Pressable accessibilityLabel="Fermer le lecteur" onPress={() => setPlaying(null)} hitSlop={8} style={styles.iconBtn}>
             <Ionicons name="close" size={19} color={Colors.textMuted} />
@@ -151,14 +220,23 @@ export function YouTubeBrowser({ onSave, onDownload }: Props) {
               <Text style={styles.fullTitle} numberOfLines={1}>{playing?.title}</Text>
             </View>
             
-            {/* NOUVEAU BOUTON : TÉLÉCHARGER (MODE PLEIN ÉCRAN) */}
             {onDownload && playing && (
-              <Pressable accessibilityLabel="Télécharger ce titre" onPress={() => onDownload(playing)} hitSlop={10} style={styles.iconBtn}>
+              <Pressable 
+                accessibilityLabel="Télécharger ce titre" 
+                onPress={() => onDownload(playing)} 
+                hitSlop={10} 
+                style={styles.iconBtn}
+              >
                 <Ionicons name="cloud-download-outline" size={21} color={Colors.success} />
               </Pressable>
             )}
 
-            <Pressable accessibilityLabel="Ajouter aux favoris" onPress={() => playing && onSave(playing, true)} hitSlop={10} style={styles.iconBtn}>
+            <Pressable 
+              accessibilityLabel="Ajouter aux favoris" 
+              onPress={() => playing && onSave(playing, true)} 
+              hitSlop={10} 
+              style={styles.iconBtn}
+            >
               <Ionicons name="heart-outline" size={21} color={Colors.purple} />
             </Pressable>
           </View>
