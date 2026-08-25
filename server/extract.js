@@ -5,6 +5,16 @@ const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
+
+// CORS ouvert (nécessaire pour la version web hébergée sur Netlify ;
+// l'app iPhone n'en a pas besoin mais ça ne gêne pas)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  next();
+});
+
 const OUT = path.join(__dirname, 'public');
 fs.mkdirSync(OUT, { recursive: true });
 
