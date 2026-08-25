@@ -64,7 +64,9 @@
       "router": {},
       "eas": {
         "projectId": "ed48510a-5690-4559-a498-8a74cec62f65"
-      }
+      },
+      "supabaseUrl": "https://bijrqoaagsvdspadrtkn.supabase.co",
+      "supabasePublishableKey": "sb_publishable_qRQqDfSBUxxAqgLNxMwdDw_mDGATg7v"
     },
     "owner": "da-audix"
   }

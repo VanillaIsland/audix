@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Radius } from '@/constants/theme';
 
 const UPDATED_AT = '23 août 2026';
-const CONTACT = 'vanillalyricsdistribution@gmail.com';
+const CONTACT = 'audix@da-audix.ai';
 
 type Block = { heading: string; paragraphs: string[] };
 
