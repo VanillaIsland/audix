@@ -2,6 +2,7 @@
   "name": "audix-ytdlp-server",
   "private": true,
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "@supabase/supabase-js": "^2.112.3"
   }
 }
