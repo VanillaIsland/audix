@@ -17,6 +17,8 @@ const supabase = createClient(
 );
 const BUCKET = 'audix-mp3';
 
+const publicUrlFor = (id) => supabase.storage.from(BUCKET).getPublicUrl(`${id}.mp3`).data.publicUrl;
+
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.get('/extract', async (req, res) => {
@@ -26,9 +28,7 @@ app.get('/extract', async (req, res) => {
   // 1. Déjà dans Supabase ? URL directe, zéro re-conversion
   try {
     const { error } = await supabase.storage.from(BUCKET).head(`${id}.mp3`);
-    if (!error) {
-      return res.json({ url: supabase.storage.from(BUCKET).getPublicUrl(`${id}.mp3`).publicUrl, cached: true });
-    }
+    if (!error) return res.json({ url: publicUrlFor(id), cached: true });
   } catch (_) {}
 
   // 2. Conversion yt-dlp
@@ -45,10 +45,8 @@ app.get('/extract', async (req, res) => {
       '-o', path.join(OUT, `${id}.%(ext)s`),
     ];
     if (fs.existsSync(COOKIES)) {
-      // Avec cookies : client web + solveur EJS (ios/android ne supportent pas les cookies)
       args.push('--cookies', COOKIES);
     } else {
-      // Sans cookies : on tente les clients mobiles anti-bot
       args.push('--extractor-args', 'youtube:player_client=ios,android,default');
     }
     args.push(`https://www.youtube.com/watch?v=${id}`);
@@ -74,7 +72,7 @@ app.get('/extract', async (req, res) => {
   // 4. Nettoyage du disque local
   fs.promises.unlink(file).catch(() => {});
 
-  res.json({ url: supabase.storage.from(BUCKET).getPublicUrl(`${id}.mp3`).publicUrl, cached: false });
+  res.json({ url: publicUrlFor(id), cached: false });
 });
 
 app.listen(process.env.PORT || 10000, () => console.log('Serveur yt-dlp prêt'));
