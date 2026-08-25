@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   deleteTrackFile,
   importAuthorizedUrl,
+  type ImportMeta,
   loadLibrary,
   loadPlaylists,
   pickOwnedMedia,
@@ -53,8 +54,8 @@ export function useLibrary() {
     return imported.length;
   }, []);
 
-  const importUrl = useCallback(async (url: string, keepOffline: boolean) => {
-    const imported = await importAuthorizedUrl(url, keepOffline);
+  const importUrl = useCallback(async (url: string, keepOffline: boolean, meta?: ImportMeta) => {
+    const imported = await importAuthorizedUrl(url, keepOffline, meta);
     setTracks((existing) => [imported, ...existing]);
     setCurrentId(imported.id);
     return imported;

@@ -128,7 +128,14 @@ export async function pickOwnedMedia(): Promise<AudixTrack[]> {
   return imported;
 }
 
-export async function importAuthorizedUrl(url: string, keepOffline: boolean): Promise<AudixTrack> {
+/** Titre, artiste et vignette connus de l'appelant, quand la source les fournit. */
+export type ImportMeta = { title?: string; artist?: string; thumbnail?: string };
+
+export async function importAuthorizedUrl(
+  url: string,
+  keepOffline: boolean,
+  meta?: ImportMeta,
+): Promise<AudixTrack> {
   const parsed = new URL(url);
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Seuls les liens HTTP(S) sont acceptés.');
 
@@ -141,8 +148,9 @@ export async function importAuthorizedUrl(url: string, keepOffline: boolean): Pr
 
     return {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      title: platform.profile.label,
-      artist: host.replace(/^www\./, ''),
+      title: meta?.title ?? platform.profile.label,
+      artist: meta?.artist ?? host.replace(/^www\./, ''),
+      thumbnail: meta?.thumbnail,
       uri: url,
       externalUrl: url,
       mimeType: 'text/html',

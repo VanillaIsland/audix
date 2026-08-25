@@ -24,6 +24,8 @@ export type AudixTrack = {
   playCount: number;
   size?: number;
   externalUrl?: string;
+  /** Vignette distante, renseignee par la recherche YouTube. */
+  thumbnail?: string;
 };
 
 export type AudixPlaylist = {

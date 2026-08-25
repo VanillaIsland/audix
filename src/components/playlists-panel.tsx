@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import type { AudixPlaylist, AudixTrack } from '@/types/media';
@@ -107,10 +107,21 @@ export function PlaylistsPanel({ playlists, tracks, currentId, selectedId, onSel
             const included = selected.trackIds.includes(track.id);
             return (
               <View key={track.id} style={[styles.trackRow, included && styles.trackRowIncluded]}>
+                <View style={styles.trackThumb}>
+                  {track.thumbnail ? (
+                    <Image source={{ uri: track.thumbnail }} style={styles.trackThumbImage} />
+                  ) : (
+                    <View style={styles.trackThumbFallback}>
+                      <Ionicons name={track.externalUrl ? 'radio-outline' : track.kind === 'audio' ? 'musical-note' : 'videocam'} size={18} color={Colors.textMuted} />
+                    </View>
+                  )}
+                </View>
+                <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={() => onPlay(track.id)} style={styles.trackMeta}>
+                  <Text style={styles.trackArtist} numberOfLines={1}>{track.artist} · {track.externalUrl ? 'En ligne' : track.downloaded ? 'Hors ligne' : 'Local'}</Text>
+                  <Text style={styles.trackTitle} numberOfLines={2}>{track.title}</Text>
+                </Pressable>
                 <Pressable accessibilityLabel={included ? `Retirer ${track.title}` : `Ajouter ${track.title}`} onPress={() => onToggleTrack(selected.id, track.id)} style={[styles.toggleButton, included && { backgroundColor: selected.color }]}><Ionicons name={included ? 'checkmark' : 'add'} size={18} color={Colors.text} /></Pressable>
-                <View style={styles.trackMeta}><Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text><Text style={styles.trackArtist} numberOfLines={1}>{track.artist}</Text></View>
-                <View style={styles.sourcePill}><Text style={styles.sourceText}>{track.externalUrl ? 'En ligne' : track.downloaded ? 'Hors ligne' : 'Local'}</Text></View>
-                <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={() => onPlay(track.id)} style={[styles.playButton, currentId === track.id && styles.playButtonActive]}><Ionicons name={currentId === track.id ? 'volume-high' : 'play'} size={18} color={Colors.cyan} /></Pressable>
+                <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={() => onPlay(track.id)} style={[styles.playButton, currentId === track.id && styles.playButtonActive]}><Ionicons name={currentId === track.id ? 'volume-high' : 'play'} size={17} color={Colors.text} /></Pressable>
               </View>
             );
           })}</View> : <View style={styles.emptyTracks}><View style={styles.emptyTrackIcon}><Ionicons name="musical-notes-outline" size={27} color={Colors.cyan} /></View><Text style={styles.emptyTitle}>Cette playlist attend son premier titre</Text><Text style={styles.emptyText}>Importe un fichier depuis ton téléphone, ou ajoute un lien YouTube, Spotify ou Facebook.</Text><View style={styles.emptyActions}><Pressable onPress={onImport} style={styles.outlineAction}><Ionicons name="folder-open-outline" size={17} color={Colors.cyan} /><Text style={styles.outlineActionText}>Importer un fichier</Text></Pressable><Pressable onPress={onGrab} style={styles.outlineAction}><Ionicons name="link-outline" size={17} color={Colors.purple} /><Text style={styles.outlineActionText}>Ouvrir Grab</Text></Pressable></View></View>}
@@ -178,16 +189,19 @@ const styles = StyleSheet.create({
   smallAction: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 13, borderWidth: 1, borderColor: '#283149', backgroundColor: '#101521' },
   smallActionText: { color: Colors.text, fontSize: 9, fontWeight: '800' },
   trackList: { gap: 8 },
-  trackRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 17, borderWidth: 1, borderColor: '#252D41', backgroundColor: '#0B0F18' },
+  trackRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 17, borderWidth: 1, borderColor: '#252D41', backgroundColor: '#0B0F18' },
   trackRowIncluded: { borderColor: '#345168', backgroundColor: '#0D1620' },
   toggleButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#1A2030' },
-  trackMeta: { flex: 1, minWidth: 0 },
-  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '800' },
-  trackArtist: { color: Colors.textMuted, fontSize: 9, marginTop: 2 },
+  trackThumb: { width: 96, height: 54, borderRadius: 9, overflow: 'hidden', backgroundColor: '#141A28' },
+  trackThumbImage: { width: '100%', height: '100%' },
+  trackThumbFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  trackMeta: { flex: 1, minWidth: 0, gap: 2 },
+  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '800', lineHeight: 16 },
+  trackArtist: { color: Colors.textMuted, fontSize: 9, fontWeight: '800' },
   sourcePill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: '#111827' },
   sourceText: { color: Colors.textMuted, fontSize: 7, fontWeight: '900', letterSpacing: 0.7 },
-  playButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
-  playButtonActive: { backgroundColor: '#0C2630' },
+  playButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: Colors.blue },
+  playButtonActive: { backgroundColor: Colors.purple },
   emptyTracks: { alignItems: 'center', gap: 9, padding: 28, borderRadius: 22, borderWidth: 1, borderStyle: 'dashed', borderColor: '#293149' },
   emptyTrackIcon: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#0B202A' },
   emptyActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 4 },

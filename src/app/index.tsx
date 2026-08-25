@@ -10,6 +10,7 @@ import { GrabPanel } from '@/components/grab-panel';
 import { GrabResults } from '@/components/grab-results';
 import { MiniPlayer } from '@/components/mini-player';
 import { Player } from '@/components/player';
+import { PlaylistPicker } from '@/components/playlist-picker';
 import { PlaylistsPanel } from '@/components/playlists-panel';
 import { TabBar, type TabItem } from '@/components/tab-bar';
 import { TrackActions } from '@/components/track-actions';
@@ -17,7 +18,8 @@ import { YouTubeBrowser } from '@/components/youtube-browser';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { usePlayback } from '@/lib/playback';
-import type { MediaOrigin, AudixPlaylist, AudixTrack, ProviderResult } from '@/types/media';
+import type { ProviderResult } from '@/lib/providers';
+import type { MediaOrigin, AudixPlaylist, AudixTrack } from '@/types/media';
 
 type Section = 'play' | 'recent' | 'downloads' | 'favorites' | 'playlists' | 'grab';
 type Notice = { tone: 'success' | 'danger' | 'info'; text: string } | null;
@@ -40,60 +42,56 @@ const TABS: readonly TabItem<Exclude<Section, 'grab'>>[] = [
 ];
 
 const ORIGIN_LABELS: Record<MediaOrigin, string> = {
-  local: 'Local', 
-  direct: 'Direct', 
-  'youtube-export': 'YouTube', 
-  'facebook-export': 'Facebook', 
-  'spotify-catalog': 'Spotify',
+  local: 'Local', direct: 'Direct', 'youtube-export': 'YouTube', 'facebook-export': 'Facebook', 'spotify-catalog': 'Spotify',
 };
 
 const sizeLabel = (bytes?: number) => !bytes ? 'En ligne' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.round(bytes / 1_000)} Ko`;
 
-function TrackRow({ track, active, onSelect, onFavorite, onMore }: { 
-  track: AudixTrack; 
-  active: boolean; 
-  onSelect: () => void; 
-  onFavorite: () => void; 
-  onMore: () => void; 
-}) {
+/**
+ * Même ligne que dans l'onglet Lecture : vignette à gauche, artiste au-dessus,
+ * titre en dessous, actions à droite. Les listes de l'app sont ainsi cohérentes.
+ */
+function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
   return (
     <View style={[styles.trackRow, active && styles.trackRowActive]}>
-      <Pressable onPress={onSelect} style={styles.trackMain}>
-        <LinearGradient colors={active ? Gradients.brand : ['#1A2030', '#101521', '#0B0F18']} style={styles.trackIcon}>
-          <Ionicons name={track.externalUrl ? 'radio-outline' : track.kind === 'audio' ? 'musical-note' : 'videocam'} size={20} color={Colors.text} />
-        </LinearGradient>
-        <View style={styles.trackMeta}>
-          <Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text>
-          <Text style={styles.trackArtist} numberOfLines={1}>{track.artist} · {sizeLabel(track.size)}</Text>
-        </View>
+      <Pressable onPress={onSelect} style={styles.trackThumb}>
+        {track.thumbnail ? (
+          <Image source={{ uri: track.thumbnail }} style={styles.trackThumbImage} />
+        ) : (
+          <LinearGradient colors={active ? Gradients.brand : ['#1A2030', '#101521', '#0B0F18']} style={styles.trackThumbFallback}>
+            <Ionicons name={track.externalUrl ? 'radio-outline' : track.kind === 'audio' ? 'musical-note' : 'videocam'} size={20} color={Colors.text} />
+          </LinearGradient>
+        )}
+        {track.downloaded ? (
+          <View style={styles.trackThumbBadge}>
+            <Ionicons name="checkmark" size={11} color={Colors.text} />
+          </View>
+        ) : null}
       </Pressable>
-      <View style={styles.sourceBadge}><Text style={styles.sourceText}>{ORIGIN_LABELS[track.origin]}</Text></View>
-      {track.downloaded ? <Ionicons name="checkmark-circle" color={Colors.success} size={17} /> : null}
-      <Pressable 
-        accessibilityLabel={track.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} 
-        onPress={onFavorite} 
-        hitSlop={10} 
-        style={styles.rowIconButton}
-      >
-        <Ionicons name={track.favorite ? 'heart' : 'heart-outline'} color={track.favorite ? Colors.purple : Colors.textMuted} size={20} />
+
+      <Pressable onPress={onSelect} style={styles.trackCopy}>
+        <Text style={styles.trackArtist} numberOfLines={1}>
+          {track.artist} · {ORIGIN_LABELS[track.origin]} · {sizeLabel(track.size)}
+        </Text>
+        <Text style={styles.trackTitle} numberOfLines={2}>{track.title}</Text>
       </Pressable>
-      <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={onSelect} hitSlop={8} style={styles.rowIconButton}>
-        <Ionicons name={active ? 'volume-high' : 'play'} color={Colors.cyan} size={19} />
-      </Pressable>
-      <Pressable accessibilityLabel={`Actions pour ${track.title}`} onPress={onMore} hitSlop={8} style={styles.rowIconButton}>
-        <Ionicons name="ellipsis-horizontal" color={Colors.textMuted} size={19} />
-      </Pressable>
+
+      <View style={styles.trackActions}>
+        <Pressable accessibilityLabel={`Lire ${track.title}`} onPress={onSelect} hitSlop={6} style={[styles.trackPlay, active && styles.trackPlayOn]}>
+          <Ionicons name={active ? 'volume-high' : 'play'} size={17} color={Colors.text} />
+        </Pressable>
+        <Pressable accessibilityLabel={track.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={onFavorite} hitSlop={6} style={styles.rowIconButton}>
+          <Ionicons name={track.favorite ? 'heart' : 'heart-outline'} color={track.favorite ? Colors.purple : Colors.textMuted} size={18} />
+        </Pressable>
+        <Pressable accessibilityLabel={`Actions pour ${track.title}`} onPress={onMore} hitSlop={6} style={styles.rowIconButton}>
+          <Ionicons name="ellipsis-horizontal" color={Colors.textMuted} size={18} />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-function EmptyState({ icon, title, copy, action, onAction }: { 
-  icon: keyof typeof Ionicons.glyphMap; 
-  title: string; 
-  copy: string; 
-  action?: string; 
-  onAction?: () => void; 
-}) {
+function EmptyState({ icon, title, copy, action, onAction }: { icon: keyof typeof Ionicons.glyphMap; title: string; copy: string; action?: string; onAction?: () => void }) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyOrbit}>
@@ -119,7 +117,6 @@ export default function HomeScreen() {
   const playback = usePlayback();
   const [section, setSection] = useState<Section>('play');
   const [query, setQuery] = useState('');
-  const [searchQuery, setSearchQuery] = useState(''); // Query persistante pour YouTube
   const [grabUrl, setGrabUrl] = useState('');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [grabBusy, setGrabBusy] = useState(false);
@@ -129,17 +126,7 @@ export default function HomeScreen() {
   const [actionTrack, setActionTrack] = useState<AudixTrack | null>(null);
   const [playerOpen, setPlayerOpen] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-
-  // Créer automatiquement la playlist "Downloaded" si elle n'existe pas
-  useEffect(() => {
-    const ensureDownloadedPlaylist = async () => {
-      const downloadedPlaylist = library.playlists.find(p => p.name.toLowerCase() === 'downloaded');
-      if (!downloadedPlaylist) {
-        await library.createPlaylist('Downloaded');
-      }
-    };
-    ensureDownloadedPlaylist();
-  }, [library.playlists, library.createPlaylist]);
+  const [pickerResult, setPickerResult] = useState<ProviderResult | null>(null);
 
   const visibleTracks = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -166,25 +153,14 @@ export default function HomeScreen() {
     playback.playTrack(track, playableQueue.length ? playableQueue : [track]);
   }, [library, playableQueue, playback]);
 
-  const showNotice = (next: Notice) => { 
-    setNotice(next); 
-    if (next) setTimeout(() => setNotice(null), 4200); 
-  };
-  
-  const navigate = (next: Section) => { 
-    setSection(next); 
-    if (next === 'playlists' && !selectedPlaylistId && library.playlists[0]) {
-      setSelectedPlaylistId(library.playlists[0].id);
-    }
-  };
+  const showNotice = (next: Notice) => { setNotice(next); if (next) setTimeout(() => setNotice(null), 4200); };
+  const navigate = (next: Section) => { setSection(next); if (next === 'playlists' && !selectedPlaylistId && library.playlists[0]) setSelectedPlaylistId(library.playlists[0].id); };
 
   const importFiles = async () => {
     try {
       const count = await library.importFiles(grabPlaylistId);
       if (count) showNotice({ tone: 'success', text: `${count} média${count > 1 ? 's' : ''} ajouté${count > 1 ? 's' : ''} à la bibliothèque.` });
-    } catch (error) { 
-      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' }); 
-    }
+    } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' }); }
   };
 
   const importLink = async (url: string, keepOffline = false, playlistId: string | null = null) => {
@@ -194,33 +170,23 @@ export default function HomeScreen() {
   };
 
   const grab = async (keepOffline: boolean) => {
-    if (!rightsConfirmed) { 
-      showNotice({ tone: 'danger', text: 'Active la confirmation « Catalogue autorisé » avant l'ajout.' }); 
-      return; 
-    }
+    if (!rightsConfirmed) { showNotice({ tone: 'danger', text: 'Active la confirmation « Catalogue autorisé » avant l’ajout.' }); return; }
     setGrabBusy(true);
     try {
       const imported = await importLink(grabUrl.trim(), keepOffline, grabPlaylistId);
-      setGrabUrl(''); 
-      setSection('play');
-      showNotice({ 
-        tone: 'success', 
-        text: imported.externalUrl 
-          ? 'Référence officielle ajoutée. Le lecteur embarqué est prêt.' 
-          : keepOffline 
-            ? 'Master téléchargé et prêt hors ligne.' 
-            : 'Média direct ajouté et prêt à lire.' 
-      });
-    } catch (error) { 
-      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ce lien ne peut pas être ajouté.' }); 
-    } finally { 
-      setGrabBusy(false); 
-    }
+      setGrabUrl(''); setSection('play');
+      showNotice({ tone: 'success', text: imported.externalUrl ? 'Référence officielle ajoutée. Le lecteur embarqué est prêt.' : keepOffline ? 'Master téléchargé et prêt hors ligne.' : 'Média direct ajouté et prêt à lire.' });
+    } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ce lien ne peut pas être ajouté.' }); }
+    finally { setGrabBusy(false); }
   };
 
   const saveFromBrowser = useCallback(async (result: ProviderResult, favorite: boolean) => {
     try {
-      const imported = await library.importUrl(result.url, false);
+      const imported = await library.importUrl(result.url, false, {
+        title: result.title,
+        artist: result.artist,
+        thumbnail: result.thumbnail,
+      });
       if (favorite) library.toggleFavorite(imported.id);
       showNotice({ tone: 'success', text: favorite ? 'Ajouté aux favoris.' : 'Ajouté à la bibliothèque.' });
     } catch (error) {
@@ -228,51 +194,42 @@ export default function HomeScreen() {
     }
   }, [library]);
 
-  // Téléchargement avec playlist auto "Downloaded"
+  // NOUVELLE FONCTION : Téléchargement depuis le navigateur YouTube
   const downloadFromYouTube = useCallback(async (result: ProviderResult) => {
     try {
       showNotice({ tone: 'info', text: 'Préparation du téléchargement...' });
-      
-      // Trouver ou créer la playlist "Downloaded"
-      let downloadedPlaylist = library.playlists.find(p => p.name.toLowerCase() === 'downloaded');
-      if (!downloadedPlaylist) {
-        downloadedPlaylist = await library.createPlaylist('Downloaded');
-      }
-      
-      // Télécharger le fichier
-      const imported = await library.importUrl(result.url, true);
-      
-      // Ajouter à la playlist Downloaded
-      library.addTrackToPlaylist(downloadedPlaylist.id, imported.id);
-      
-      showNotice({ 
-        tone: 'success', 
-        text: `"${result.title}" téléchargé et ajouté à la playlist "Downloaded".` 
+      // On force keepOffline à true pour déclencher le téléchargement local
+      const imported = await library.importUrl(result.url, true, {
+        title: result.title,
+        artist: result.artist,
+        thumbnail: result.thumbnail,
       });
+      // Tout ce qui est téléchargé se retrouve dans une playlist « Downloaded ».
+      const existing = library.playlists.find((playlist) => playlist.name.toLowerCase() === 'downloaded');
+      const downloaded = existing ?? library.createPlaylist('Downloaded');
+      library.addTrackToPlaylist(downloaded.id, imported.id);
+      showNotice({ tone: 'success', text: `« ${result.title} » est hors ligne, dans la playlist Downloaded.` });
     } catch (error) {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Échec du téléchargement.' });
     }
   }, [library]);
 
-  // Ajout à une playlist spécifique
-  const addToPlaylistFromBrowser = useCallback(async (result: ProviderResult, playlistId: string) => {
+  /** Ajout depuis le navigateur, avec rangement immediat dans une playlist. */
+  const addFromBrowser = useCallback(async (result: ProviderResult, playlistId: string | null, newName?: string) => {
     try {
-      // Si playlistId est 'default', ouvrir un modal pour choisir
-      if (playlistId === 'default') {
-        // Pour l'instant, on ajoute à la première playlist
-        if (library.playlists.length > 0) {
-          const targetPlaylist = library.playlists[0];
-          const imported = await library.importUrl(result.url, false);
-          library.addTrackToPlaylist(targetPlaylist.id, imported.id);
-          showNotice({ tone: 'success', text: `Ajouté à "${targetPlaylist.name}".` });
-        } else {
-          showNotice({ tone: 'info', text: 'Crée d'abord une playlist.' });
-        }
-      } else {
-        const imported = await library.importUrl(result.url, false);
-        library.addTrackToPlaylist(playlistId, imported.id);
-        showNotice({ tone: 'success', text: 'Ajouté à la playlist.' });
+      const imported = await library.importUrl(result.url, false, {
+        title: result.title,
+        artist: result.artist,
+        thumbnail: result.thumbnail,
+      });
+      let target = playlistId;
+      if (newName) {
+        const created = library.createPlaylist(newName);
+        target = created.id;
       }
+      if (target) library.addTrackToPlaylist(target, imported.id);
+      const name = newName ?? library.playlists.find((playlist) => playlist.id === target)?.name;
+      showNotice({ tone: 'success', text: name ? `« ${result.title} » ajouté à ${name}.` : `« ${result.title} » ajouté à la bibliothèque.` });
     } catch (error) {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ajout impossible.' });
     }
@@ -280,16 +237,13 @@ export default function HomeScreen() {
 
   const importGrabFile = useCallback(async (file: { url: string; name: string }, keepOffline: boolean) => {
     if (!rightsConfirmed) {
-      showNotice({ tone: 'danger', text: 'Active « Catalogue autorisé » avant l'ajout.' });
+      showNotice({ tone: 'danger', text: 'Active « Catalogue autorisé » avant l’ajout.' });
       throw new Error('rights');
     }
     try {
       const imported = await library.importUrl(file.url, keepOffline);
       if (grabPlaylistId) library.addTrackToPlaylist(grabPlaylistId, imported.id);
-      showNotice({ 
-        tone: 'success', 
-        text: keepOffline ? `${file.name} téléchargé et prêt hors ligne.` : `${file.name} ajouté à la bibliothèque.` 
-      });
+      showNotice({ tone: 'success', text: keepOffline ? `${file.name} téléchargé et prêt hors ligne.` : `${file.name} ajouté à la bibliothèque.` });
     } catch (error) {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' });
       throw error;
@@ -310,19 +264,10 @@ export default function HomeScreen() {
                 {library.tracks.length} titre{library.tracks.length !== 1 ? 's' : ''} · {library.playlists.length} playlist{library.playlists.length !== 1 ? 's' : ''}
               </Text>
             </View>
-            <Pressable 
-              accessibilityLabel="Ouvrir Grab" 
-              accessibilityState={{ selected: section === 'grab' }} 
-              onPress={() => navigate('grab')} 
-              style={[styles.headerAction, section === 'grab' && styles.headerActionOn]}
-            >
+            <Pressable accessibilityLabel="Ouvrir Grab" accessibilityState={{ selected: section === 'grab' }} onPress={() => navigate('grab')} style={[styles.headerAction, section === 'grab' && styles.headerActionOn]}>
               <Ionicons name="magnet-outline" size={20} color={section === 'grab' ? Colors.cyan : Colors.text} />
             </Pressable>
-            <Pressable 
-              accessibilityLabel="Conditions d'utilisation et confidentialité" 
-              onPress={() => router.push('/legal')} 
-              style={styles.headerAction}
-            >
+            <Pressable accessibilityLabel="Conditions d’utilisation et confidentialité" onPress={() => router.push('/legal')} style={styles.headerAction}>
               <Ionicons name="document-text-outline" size={19} color={Colors.text} />
             </Pressable>
           </View>
@@ -332,171 +277,77 @@ export default function HomeScreen() {
               {library.current && !library.current.externalUrl ? (
                 <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
               ) : null}
-              <YouTubeBrowser 
-                onSave={saveFromBrowser} 
-                onDownload={downloadFromYouTube}
-                onAddToPlaylist={addToPlaylistFromBrowser}
-                savedQuery={searchQuery}
-                onQueryChange={setSearchQuery}
-              />
+              {/* MODIFICATION ICI : on passe la prop onDownload */}
+              <YouTubeBrowser onSave={saveFromBrowser} onDownload={downloadFromYouTube} onAddToPlaylist={setPickerResult} />
             </View>
           ) : null}
 
+          {section === 'grab' ? <GrabPanel url={grabUrl} onChangeUrl={setGrabUrl} rightsConfirmed={rightsConfirmed} onChangeRights={setRightsConfirmed} busy={grabBusy} playlists={library.playlists} targetPlaylistId={grabPlaylistId} onChangeTargetPlaylist={setGrabPlaylistId} onSubmit={grab} /> : null}
           {section === 'grab' ? (
-            <GrabPanel 
-              url={grabUrl} 
-              onChangeUrl={setGrabUrl} 
-              rightsConfirmed={rightsConfirmed} 
-              onChangeRights={setRightsConfirmed} 
-              busy={grabBusy} 
-              playlists={library.playlists} 
-              targetPlaylistId={grabPlaylistId} 
-              onChangeTargetPlaylist={setGrabPlaylistId} 
-              onSubmit={grab} 
-            />
+            <GrabResults url={grabUrl} targetPlaylistName={library.playlists.find((p) => p.id === grabPlaylistId)?.name ?? null} onImport={importGrabFile} />
           ) : null}
-          
-          {section === 'grab' ? (
-            <GrabResults 
-              url={grabUrl} 
-              targetPlaylistName={library.playlists.find((p) => p.id === grabPlaylistId)?.name ?? null} 
-              onImport={importGrabFile} 
-            />
-          ) : null}
-          
           {section === 'playlists' ? (
-            <PlaylistsPanel 
-              playlists={library.playlists} 
-              tracks={library.tracks} 
-              currentId={library.currentId} 
-              selectedId={selectedPlaylistId} 
-              onSelect={setSelectedPlaylistId} 
-              onCreate={library.createPlaylist} 
-              onUpdate={library.updatePlaylist} 
-              onToggleTrack={library.toggleTrackInPlaylist} 
-              onPlay={(id) => selectTrack(id, true)} 
-              onRequestDelete={setDeletePlaylist} 
-              onImport={importFiles} 
-              onGrab={() => { 
-                setGrabPlaylistId(selectedPlaylistId); 
-                setSection('grab'); 
-              }} 
-            />
+            <PlaylistsPanel playlists={library.playlists} tracks={library.tracks} currentId={library.currentId} selectedId={selectedPlaylistId} onSelect={setSelectedPlaylistId} onCreate={library.createPlaylist} onUpdate={library.updatePlaylist} onToggleTrack={library.toggleTrackInPlaylist} onPlay={(id) => selectTrack(id, true)} onRequestDelete={setDeletePlaylist} onImport={importFiles} onGrab={() => { setGrabPlaylistId(selectedPlaylistId); setSection('grab'); }} />
           ) : null}
-          
           {section !== 'play' && section !== 'grab' && section !== 'playlists' ? (
-            <LibraryPanel 
-              title={currentSection.label} 
-              eyebrow={currentSection.caption} 
-              tracks={visibleTracks} 
-              currentId={library.currentId} 
-              query={query} 
-              onQuery={setQuery} 
-              onSelect={(id) => selectTrack(id, true)} 
-              onFavorite={library.toggleFavorite} 
-              onMore={setActionTrack} 
-              emptyIcon={section === 'favorites' ? 'heart-outline' : section === 'downloads' ? 'cloud-download-outline' : 'time-outline'} 
-              emptyTitle={section === 'favorites' ? 'Aucun favori pour le moment' : section === 'downloads' ? 'Aucun titre gardé hors ligne' : 'Tu n'as encore rien écouté'} 
-              onEmptyAction={() => navigate('grab')} 
-            />
+            <LibraryPanel title={currentSection.label} eyebrow={currentSection.caption} tracks={visibleTracks} currentId={library.currentId} query={query} onQuery={setQuery} onSelect={(id) => selectTrack(id, true)} onFavorite={library.toggleFavorite} onMore={setActionTrack} emptyIcon={section === 'favorites' ? 'heart-outline' : section === 'downloads' ? 'cloud-download-outline' : 'time-outline'} emptyTitle={section === 'favorites' ? 'Aucun favori pour le moment' : section === 'downloads' ? 'Aucun titre gardé hors ligne' : 'Tu n’as encore rien écouté'} onEmptyAction={() => navigate('grab')} />
           ) : null}
 
           <View style={styles.footer}>
             <Image source={require('@/assets/brand/audix-app-icon.png')} style={styles.footerIcon} />
             <Text style={styles.footerBrand}>DA Audix, ton lecteur privé</Text>
             <Pressable onPress={() => router.push('/legal')} hitSlop={8}>
-              <Text style={styles.footerLink}>Conditions d'utilisation et confidentialité</Text>
+              <Text style={styles.footerLink}>Conditions d’utilisation et confidentialité</Text>
             </Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>
 
       <MiniPlayer onOpen={() => setPlayerOpen(true)} />
-      <TabBar 
-        items={TABS} 
-        active={(section === 'grab' ? 'play' : section) as Exclude<Section, 'grab'>} 
-        onChange={navigate} 
-      />
+      <TabBar items={TABS} active={(section === 'grab' ? 'play' : section) as Exclude<Section, 'grab'>} onChange={navigate} />
       
       {notice ? (
-        <Pressable 
-          onPress={() => setNotice(null)} 
-          style={[styles.notice, notice.tone === 'danger' ? styles.noticeDanger : notice.tone === 'success' ? styles.noticeSuccess : styles.noticeInfo]}
-        >
+        <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === 'danger' ? styles.noticeDanger : notice.tone === 'success' ? styles.noticeSuccess : styles.noticeInfo]}>
           <Ionicons name={notice.tone === 'danger' ? 'alert-circle' : notice.tone === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={notice.tone === 'danger' ? Colors.danger : notice.tone === 'success' ? Colors.success : Colors.cyan} />
           <Text style={styles.noticeText}>{notice.text}</Text>
           <Ionicons name="close" size={16} color={Colors.textMuted} />
         </Pressable>
       ) : null}
 
-      <FullPlayer 
-        visible={playerOpen} 
-        track={library.current} 
-        onClose={() => setPlayerOpen(false)} 
-        onImport={importFiles} 
-        onToggleFavorite={library.toggleFavorite} 
+      <FullPlayer visible={playerOpen} track={library.current} onClose={() => setPlayerOpen(false)} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
+      
+      <TrackActions
+        track={actionTrack}
+        onClose={() => setActionTrack(null)}
+        onSave={(id, changes) => { library.updateTrack(id, changes); showNotice({ tone: 'success', text: 'Informations mises à jour.' }); }}
+        onDelete={(id) => { library.deleteTrack(id).catch(() => undefined); showNotice({ tone: 'success', text: 'Titre supprimé de la bibliothèque.' }); }}
+        onToggleFavorite={(id) => { library.toggleFavorite(id); setActionTrack((t) => (t ? { ...t, favorite: !t.favorite } : t)); }}
       />
       
-      <TrackActions 
-        track={actionTrack} 
-        onClose={() => setActionTrack(null)} 
-        onSave={(id, changes) => { 
-          library.updateTrack(id, changes); 
-          showNotice({ tone: 'success', text: 'Informations mises à jour.' }); 
-        }} 
-        onDelete={(id) => { 
-          library.deleteTrack(id).catch(() => undefined); 
-          showNotice({ tone: 'success', text: 'Titre supprimé de la bibliothèque.' }); 
-        }} 
-        onToggleFavorite={(id) => { 
-          library.toggleFavorite(id); 
-          setActionTrack((t) => (t ? { ...t, favorite: !t.favorite } : t)); 
-        }} 
+      <PlaylistPicker
+        visible={Boolean(pickerResult)}
+        trackTitle={pickerResult?.title ?? ''}
+        playlists={library.playlists}
+        onCancel={() => setPickerResult(null)}
+        onConfirm={(playlistId, newName) => {
+          const target = pickerResult;
+          setPickerResult(null);
+          if (target) addFromBrowser(target, playlistId, newName).catch(() => undefined);
+        }}
       />
-      
-      <ConfirmDialog 
-        visible={Boolean(deletePlaylist)} 
-        title="Supprimer cette playlist ?" 
-        message={deletePlaylist ? `« ${deletePlaylist.name} » sera supprimée. Les titres resteront dans ta bibliothèque Audix.` : ''} 
-        onCancel={() => setDeletePlaylist(null)} 
-        onConfirm={() => { 
-          if (deletePlaylist) library.deletePlaylist(deletePlaylist.id); 
-          setSelectedPlaylistId(null); 
-          setDeletePlaylist(null); 
-          showNotice({ tone: 'success', text: 'Playlist supprimée. Tes médias sont intacts.' }); 
-        }} 
+
+      <ConfirmDialog
+        visible={Boolean(deletePlaylist)}
+        title="Supprimer cette playlist ?"
+        message={deletePlaylist ? `« ${deletePlaylist.name} » sera supprimée. Les titres resteront dans ta bibliothèque Audix.` : ''}
+        onCancel={() => setDeletePlaylist(null)}
+        onConfirm={() => { if (deletePlaylist) library.deletePlaylist(deletePlaylist.id); setSelectedPlaylistId(null); setDeletePlaylist(null); showNotice({ tone: 'success', text: 'Playlist supprimée. Tes médias sont intacts.' }); }}
       />
     </View>
   );
 }
 
-function LibraryPanel({ 
-  title, 
-  eyebrow, 
-  tracks, 
-  currentId, 
-  query, 
-  onQuery, 
-  onSelect, 
-  onFavorite, 
-  onMore, 
-  emptyIcon, 
-  emptyTitle, 
-  onEmptyAction 
-}: { 
-  title: string; 
-  eyebrow: string; 
-  tracks: AudixTrack[]; 
-  currentId: string | null; 
-  query: string; 
-  onQuery: (value: string) => void; 
-  onSelect: (id: string) => void; 
-  onFavorite: (id: string) => void; 
-  onMore: (track: AudixTrack) => void; 
-  emptyIcon: keyof typeof Ionicons.glyphMap; 
-  emptyTitle: string; 
-  onEmptyAction: () => void; 
-}) {
+function LibraryPanel({ title, eyebrow, tracks, currentId, query, onQuery, onSelect, onFavorite, onMore, emptyIcon, emptyTitle, onEmptyAction }: { title: string; eyebrow: string; tracks: AudixTrack[]; currentId: string | null; query: string; onQuery: (value: string) => void; onSelect: (id: string) => void; onFavorite: (id: string) => void; onMore: (track: AudixTrack) => void; emptyIcon: keyof typeof Ionicons.glyphMap; emptyTitle: string; onEmptyAction: () => void }) {
   return (
     <View style={styles.librarySection}>
       <View style={styles.libraryHeader}>
@@ -507,34 +358,15 @@ function LibraryPanel({
         </View>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={16} color={Colors.textMuted} />
-          <TextInput 
-            value={query} 
-            onChangeText={onQuery} 
-            placeholder="Titre, artiste, album" 
-            placeholderTextColor="#50586F" 
-            style={styles.searchInput} 
-          />
+          <TextInput value={query} onChangeText={onQuery} placeholder="Titre, artiste, album" placeholderTextColor="#50586F" style={styles.searchInput} />
         </View>
       </View>
       {tracks.length ? (
         tracks.map((track) => (
-          <TrackRow 
-            key={track.id} 
-            track={track} 
-            active={track.id === currentId} 
-            onSelect={() => onSelect(track.id)} 
-            onFavorite={() => onFavorite(track.id)} 
-            onMore={() => onMore(track)} 
-          />
+          <TrackRow key={track.id} track={track} active={track.id === currentId} onSelect={() => onSelect(track.id)} onFavorite={() => onFavorite(track.id)} onMore={() => onMore(track)} />
         ))
       ) : (
-        <EmptyState 
-          icon={emptyIcon} 
-          title={emptyTitle} 
-          copy="Importe un fichier depuis ton téléphone, ou ajoute un lien YouTube, Spotify ou Facebook avec Grab." 
-          action="Ouvrir Grab" 
-          onAction={onEmptyAction} 
-        />
+        <EmptyState icon={emptyIcon} title={emptyTitle} copy="Importe un fichier depuis ton téléphone, ou ajoute un lien YouTube, Spotify ou Facebook avec Grab." action="Ouvrir Grab" onAction={onEmptyAction} />
       )}
     </View>
   );
@@ -601,13 +433,21 @@ const styles = StyleSheet.create({
   librarySubtitle: { color: Colors.textMuted, fontSize: 9, marginTop: 2 },
   searchBox: { width: 230, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: Radius.pill, borderWidth: 1, borderColor: '#283149', backgroundColor: '#080B12' },
   searchInput: { flex: 1, height: 40, color: Colors.text, fontSize: 10 },
-  trackRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 8, borderRadius: 14, backgroundColor: Colors.surfaceRaised },
+  trackThumb: { width: 96, height: 54, borderRadius: 9, overflow: 'hidden', backgroundColor: Colors.surfaceRaised },
+  trackThumbImage: { width: '100%', height: '100%' },
+  trackThumbFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  trackThumbBadge: { position: 'absolute', right: 4, bottom: 4, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.65)' },
+  trackCopy: { flex: 1, minWidth: 0, gap: 2 },
+  trackActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  trackPlay: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: Colors.blue },
+  trackPlayOn: { backgroundColor: Colors.purple },
+  trackRow: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 14, backgroundColor: Colors.surfaceRaised },
   trackRowActive: { backgroundColor: '#12233A' },
   trackMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   trackIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   trackMeta: { flex: 1, minWidth: 0 },
-  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '900' },
-  trackArtist: { color: Colors.textMuted, fontSize: 9, marginTop: 3 },
+  trackTitle: { color: Colors.text, fontSize: 12, fontWeight: '800', lineHeight: 16 },
+  trackArtist: { color: Colors.textMuted, fontSize: 9, fontWeight: '800' },
   sourceBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: '#121827' },
   sourceText: { color: Colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.2 },
   rowIconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
