@@ -34,8 +34,6 @@ app.get('/extract', async (req, res) => {
   // 2. Conversion yt-dlp
   const file = path.join(OUT, `${id}.mp3`);
   if (!fs.existsSync(file)) {
-    // Copie les cookies vers /tmp : yt-dlp les ré-écrit à la sortie,
-    // et /etc/secrets est en lecture seule → ça crashait avant.
     if (fs.existsSync(COOKIES_SRC)) {
       try { fs.copyFileSync(COOKIES_SRC, COOKIES); } catch (_) {}
     }
@@ -43,10 +41,16 @@ app.get('/extract', async (req, res) => {
     const args = [
       '-x', '--audio-format', 'mp3', '--audio-quality', '6',
       '--no-playlist', '--js-runtimes', 'node',
-      '--extractor-args', 'youtube:player_client=ios,android,default',
+      '--remote-components', 'ejs:github',
       '-o', path.join(OUT, `${id}.%(ext)s`),
     ];
-    if (fs.existsSync(COOKIES)) args.push('--cookies', COOKIES);
+    if (fs.existsSync(COOKIES)) {
+      // Avec cookies : client web + solveur EJS (ios/android ne supportent pas les cookies)
+      args.push('--cookies', COOKIES);
+    } else {
+      // Sans cookies : on tente les clients mobiles anti-bot
+      args.push('--extractor-args', 'youtube:player_client=ios,android,default');
+    }
     args.push(`https://www.youtube.com/watch?v=${id}`);
 
     const result = await new Promise((resolve) => {
