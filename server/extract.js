@@ -8,7 +8,8 @@ const app = express();
 const OUT = path.join(__dirname, 'public');
 fs.mkdirSync(OUT, { recursive: true });
 
-const COOKIES = '/etc/secrets/cookies.txt';
+const COOKIES_SRC = '/etc/secrets/cookies.txt'; // lecture seule (Secret File Render)
+const COOKIES = '/tmp/cookies.txt';             // copie inscriptible pour yt-dlp
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -30,9 +31,15 @@ app.get('/extract', async (req, res) => {
     }
   } catch (_) {}
 
-  // 2. Conversion yt-dlp (client iOS anti-bot + cookies si présents)
+  // 2. Conversion yt-dlp
   const file = path.join(OUT, `${id}.mp3`);
   if (!fs.existsSync(file)) {
+    // Copie les cookies vers /tmp : yt-dlp les ré-écrit à la sortie,
+    // et /etc/secrets est en lecture seule → ça crashait avant.
+    if (fs.existsSync(COOKIES_SRC)) {
+      try { fs.copyFileSync(COOKIES_SRC, COOKIES); } catch (_) {}
+    }
+
     const args = [
       '-x', '--audio-format', 'mp3', '--audio-quality', '6',
       '--no-playlist', '--js-runtimes', 'node',
