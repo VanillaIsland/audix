@@ -28,18 +28,27 @@ app.get('/extract', async (req, res) => {
     }
   } catch (_) {}
 
-  // 2. Conversion locale yt-dlp (mp3 compressé ~128 kbps)
+  // 2. Conversion locale yt-dlp
   const file = path.join(OUT, `${id}.mp3`);
   if (!fs.existsSync(file)) {
-    const ok = await new Promise((resolve) => {
+    const result = await new Promise((resolve) => {
       execFile(
         'yt-dlp',
-        ['-x', '--audio-format', 'mp3', '--audio-quality', '6', '-o', path.join(OUT, `${id}.%(ext)s`), `https://www.youtube.com/watch?v=${id}`],
+        [
+          '-x', '--audio-format', 'mp3', '--audio-quality', '6',
+          '--no-playlist', '--js-runtimes', 'node',
+          '--extractor-args', 'youtube:player_client=default,android',
+          '-o', path.join(OUT, `${id}.%(ext)s`),
+          `https://www.youtube.com/watch?v=${id}`,
+        ],
         { timeout: 240000 },
-        (err) => resolve(!err)
+        (err, stdout, stderr) => resolve({ ok: !err, stderr: String(stderr || (err && err.message) || '') })
       );
     });
-    if (!ok || !fs.existsSync(file)) return res.status(500).json({ error: 'yt-dlp a échoué' });
+    console.log('yt-dlp stderr:', result.stderr);
+    if (!result.ok || !fs.existsSync(file)) {
+      return res.status(500).json({ error: 'yt-dlp a échoué', details: result.stderr.slice(-800) });
+    }
   }
 
   // 3. Upload version compressée dans Supabase Storage
@@ -49,7 +58,7 @@ app.get('/extract', async (req, res) => {
   });
   if (upErr) return res.status(500).json({ error: 'Upload Supabase échoué : ' + upErr.message });
 
-  // 4. Le disque local ne sert plus à rien : on nettoie (plan gratuit OK)
+  // 4. Nettoyage du disque local
   fs.promises.unlink(file).catch(() => {});
 
   res.json({ url: supabase.storage.from(BUCKET).getPublicUrl(`${id}.mp3`).publicUrl, cached: false });
