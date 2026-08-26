@@ -4,7 +4,7 @@
     "slug": "audix",
     "version": "0.2.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/brand/audix-app-icon.png",
     "scheme": "audix",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
