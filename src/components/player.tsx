@@ -36,7 +36,7 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
     return <ExternalPlayer track={track} onToggleFavorite={onToggleFavorite} />;
   }
 
-  const { currentTime, duration, playing, isBuffering, rate, shuffle, repeat, crossfade } = playback;
+  const { currentTime, duration, playing, isBuffering, rate, shuffle, dj, repeat, crossfade } = playback;
   const progress = duration > 0 ? currentTime / duration : 0;
   const active = playback.current ?? track;
 
@@ -159,6 +159,13 @@ export function Player({ track, onImport, onToggleFavorite }: Props) {
           style={[styles.pill, crossfade > 0 && styles.pillOn]}>
           <Ionicons name="git-compare-outline" size={15} color={crossfade > 0 ? Colors.cyan : Colors.textMuted} />
           <Text style={styles.pillText}>{crossfade > 0 ? `${crossfade}s` : 'Fondu'}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={dj ? 'Mode DJ activé' : 'Activer le mode DJ'}
+          onPress={playback.toggleDj}
+          style={[styles.pill, dj && styles.pillOn]}>
+          <Ionicons name="sparkles" size={15} color={dj ? Colors.purple : Colors.textMuted} />
+          <Text style={styles.pillText}>DJ</Text>
         </Pressable>
         <Pressable accessibilityLabel="Importer des fichiers" onPress={onImport} style={styles.pill}>
           <Ionicons name="add" size={16} color={Colors.cyan} />

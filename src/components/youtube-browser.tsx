@@ -44,6 +44,20 @@ export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, 
     }
   }, [query, onQueryChange]);
 
+  /**
+   * Suivant et précédent dans l'aperçu : on avance dans les résultats de la
+   * recherche en cours, comme une file de lecture.
+   */
+  const step = useCallback((delta: number) => {
+    setPlaying((currentItem) => {
+      if (!currentItem || !results.length) return currentItem;
+      const position = results.findIndex((item) => item.id === currentItem.id);
+      if (position === -1) return currentItem;
+      const target = (position + delta + results.length) % results.length;
+      return results[target];
+    });
+  }, [results]);
+
   const playAudio = useCallback((item: ProviderResult) => {
     if (onStream) onStream(item);
     else setPlaying(item);
@@ -120,6 +134,12 @@ export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, 
               <Text style={styles.miniLinkText}>Vidéo bloquée ici ? Ouvrir dans YouTube</Text>
             </Pressable>
           </View>
+          <Pressable accessibilityLabel="Résultat précédent" onPress={() => step(-1)} hitSlop={8} style={styles.iconBtn}>
+            <Ionicons name="play-skip-back" size={16} color={Colors.textMuted} />
+          </Pressable>
+          <Pressable accessibilityLabel="Résultat suivant" onPress={() => step(1)} hitSlop={8} style={styles.iconBtn}>
+            <Ionicons name="play-skip-forward" size={16} color={Colors.textMuted} />
+          </Pressable>
           <Pressable accessibilityLabel="Fermer le lecteur" onPress={() => setPlaying(null)} hitSlop={8} style={styles.iconBtn}>
             <Ionicons name="close" size={19} color={Colors.textMuted} />
           </Pressable>
@@ -157,6 +177,12 @@ export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, 
           <View style={styles.fullBar}>
             <Pressable accessibilityLabel="Réduire" onPress={() => setExpanded(false)} hitSlop={10} style={styles.iconBtn}>
               <Ionicons name="chevron-down" size={24} color={Colors.text} />
+            </Pressable>
+            <Pressable accessibilityLabel="Résultat précédent" onPress={() => step(-1)} hitSlop={10} style={styles.iconBtn}>
+              <Ionicons name="play-skip-back" size={19} color={Colors.text} />
+            </Pressable>
+            <Pressable accessibilityLabel="Résultat suivant" onPress={() => step(1)} hitSlop={10} style={styles.iconBtn}>
+              <Ionicons name="play-skip-forward" size={19} color={Colors.text} />
             </Pressable>
             <View style={styles.fullCopy}>
               <Text style={styles.miniArtist} numberOfLines={1}>{playing?.artist}</Text>

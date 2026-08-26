@@ -18,6 +18,7 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 
+import { djOrder } from '@/lib/smart';
 import type { AudixTrack } from '@/types/media';
 
 export type RepeatMode = 'none' | 'one' | 'all';
@@ -41,6 +42,8 @@ type PlaybackValue = {
   isLoaded: boolean;
   rate: number;
   shuffle: boolean;
+  /** Mode DJ : l'aléatoire enchaîne par genre, artiste et BPM proches. */
+  dj: boolean;
   repeat: RepeatMode;
   /** Crossfade length in seconds. 0 disables it entirely. */
   crossfade: number;
@@ -57,6 +60,7 @@ type PlaybackValue = {
   seekTo: (seconds: number) => void;
   seekBy: (delta: number) => void;
   setRate: (rate: number) => void;
+  toggleDj: () => void;
   setCrossfade: (seconds: number) => void;
   setVolume: (value: number) => void;
   toggleShuffle: () => void;
@@ -69,6 +73,10 @@ const PlaybackContext = createContext<PlaybackValue | null>(null);
 
 const isPlayable = (track: AudixTrack | null | undefined): track is AudixTrack =>
   Boolean(track && !track.externalUrl && track.uri);
+
+/** Ordre de lecture aléatoire : DJ trie par affinité, sinon tirage classique. */
+const orderFor = (tracks: AudixTrack[], pinned: AudixTrack | null, djMode: boolean) =>
+  djMode ? djOrder(tracks, pinned) : shuffleFrom(tracks, pinned);
 
 const shuffleFrom = (tracks: AudixTrack[], pinned: AudixTrack | null) => {
   const rest = tracks.filter((track) => track.id !== pinned?.id);
@@ -95,6 +103,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [index, setIndex] = useState(-1);
   const [rate, setRateState] = useState(1);
   const [shuffle, setShuffle] = useState(false);
+  const [dj, setDj] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>('none');
   const [crossfade, setCrossfadeState] = useState(0);
   const [volume, setVolumeState] = useState(1);
@@ -234,14 +243,14 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     idle.pause();
     const pool = (nextQueue ?? queueRef.current).filter((item) => isPlayable(item));
     const resolved = pool.some((item) => item.id === track.id) ? pool : [track, ...pool];
-    const ordered = shuffle ? shuffleFrom(resolved, track) : resolved;
+    const ordered = shuffle ? orderFor(resolved, track, dj) : resolved;
     const position = Math.max(ordered.findIndex((item) => item.id === track.id), 0);
     setBaseQueue(resolved);
     setQueue(ordered);
     setIndex(position);
     loadInto(active, ordered[position], true);
     bindLockScreen(active, ordered[position]);
-  }, [active, bindLockScreen, idle, loadInto, shuffle, stopFade]);
+  }, [active, bindLockScreen, dj, idle, loadInto, shuffle, stopFade]);
 
   const play = useCallback(() => { if (isPlayable(currentRef.current)) active.play(); }, [active]);
   const pause = useCallback(() => { stopFade(); active.pause(); }, [active, stopFade]);
@@ -303,12 +312,29 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     setShuffle((wasOn) => {
       const nowOn = !wasOn;
       const pinned = currentRef.current;
-      const reordered = nowOn ? shuffleFrom(baseQueue, pinned) : baseQueue;
+      const reordered = nowOn ? orderFor(baseQueue, pinned, dj) : baseQueue;
       setQueue(reordered);
       setIndex(pinned ? Math.max(reordered.findIndex((t) => t.id === pinned.id), 0) : -1);
       return nowOn;
     });
-  }, [baseQueue]);
+  }, [baseQueue, dj]);
+
+  /**
+   * Le mode DJ ne change rien tant que l'aléatoire est coupé. Activé avec lui,
+   * il réordonne la file en enchaînant les titres les plus proches.
+   */
+  const toggleDj = useCallback(() => {
+    setDj((wasOn) => {
+      const nowOn = !wasOn;
+      if (shuffle) {
+        const pinned = currentRef.current;
+        const reordered = orderFor(baseQueue, pinned, nowOn);
+        setQueue(reordered);
+        setIndex(pinned ? Math.max(reordered.findIndex((t) => t.id === pinned.id), 0) : -1);
+      }
+      return nowOn;
+    });
+  }, [baseQueue, shuffle]);
 
   const cycleRepeat = useCallback(() => {
     setRepeat((mode) => (mode === 'none' ? 'all' : mode === 'all' ? 'one' : 'none'));
@@ -357,11 +383,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playing: status.playing ?? false,
     isBuffering: status.isBuffering ?? false,
     isLoaded: status.isLoaded ?? false,
-    rate, shuffle, repeat, crossfade, volume,
+    rate, shuffle, dj, repeat, crossfade, volume,
     hasNext: index >= 0 && (index + 1 < queue.length || repeat === 'all'),
     hasPrevious: index > 0 || repeat === 'all',
     playTrack, toggle, play, pause, next, previous, seekTo, seekBy,
-    setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
+    toggleDj, setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
   }), [
     current, queue, index, status.currentTime, status.duration, status.playing,
     status.isBuffering, status.isLoaded, rate, shuffle, repeat, crossfade, volume,

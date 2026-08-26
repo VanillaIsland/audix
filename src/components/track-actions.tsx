@@ -8,7 +8,7 @@ import type { AudixTrack } from '@/types/media';
 type Props = {
   track: AudixTrack | null;
   onClose: () => void;
-  onSave: (id: string, changes: { title: string; artist: string; album: string }) => void;
+  onSave: (id: string, changes: { title: string; artist: string; album: string; genre: string; bpm?: number }) => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 };
@@ -22,6 +22,8 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
+  const [genre, setGenre] = useState('');
+  const [bpm, setBpm] = useState('');
   const [confirming, setConfirming] = useState(false);
 
   // Refill the form whenever a different track opens the sheet.
@@ -29,6 +31,8 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
     setTitle(track?.title ?? '');
     setArtist(track?.artist ?? '');
     setAlbum(track?.album ?? '');
+    setGenre(track?.genre ?? '');
+    setBpm(track?.bpm ? String(Math.round(track.bpm)) : '');
     setConfirming(false);
   }, [track]);
 
@@ -55,6 +59,14 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
             <View style={styles.field}>
               <Text style={styles.label}>Album</Text>
               <TextInput value={album} onChangeText={setAlbum} style={styles.input} placeholderTextColor="#50586F" placeholder="Album (facultatif)" />
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Genre</Text>
+              <TextInput value={genre} onChangeText={setGenre} style={styles.input} placeholderTextColor="#50586F" placeholder="Afro, dancehall, gospel…" />
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>BPM</Text>
+              <TextInput value={bpm} onChangeText={setBpm} keyboardType="number-pad" style={styles.input} placeholderTextColor="#50586F" placeholder="Tempo, utilisé par le mode DJ" />
             </View>
 
             <Pressable style={styles.row} onPress={() => onToggleFavorite(track.id)}>
@@ -94,7 +106,7 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
             <Pressable
               disabled={!dirty}
               style={[styles.save, !dirty && styles.saveOff]}
-              onPress={() => { onSave(track.id, { title, artist, album }); onClose(); }}>
+              onPress={() => { onSave(track.id, { title, artist, album, genre, bpm: Number(bpm.replace(/[^0-9]/g, '')) || undefined }); onClose(); }}>
               <Text style={styles.saveText}>Enregistrer</Text>
             </Pressable>
           </View>

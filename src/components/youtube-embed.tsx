@@ -1,0 +1,77 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
+
+import { Colors } from '@/constants/theme';
+
+type Props = { videoId: string; autoPlay?: boolean; onAudio?: () => void };
+
+/**
+ * Les erreurs 150, 152 et 153 du player YouTube viennent presque toujours d'une
+ * origine manquante : une WebView qui charge du HTML brut n'a pas d'origine, et
+ * le player refuse. On donne donc au document une vraie origine déclarée, la
+ * même que le site web d'Audix, et on la répète dans playerVars.
+ */
+const ORIGIN = 'https://audix-audio.netlify.app';
+
+export function YouTubeSurface({ videoId, autoPlay = false, onAudio }: Props) {
+  const [attempt, setAttempt] = useState(0);
+  const [blocked, setBlocked] = useState(false);
+  const valid = /^[A-Za-z0-9_-]{6,20}$/.test(videoId ?? '');
+
+  useEffect(() => { setAttempt(0); setBlocked(false); }, [videoId]);
+
+  // Premier essai sur youtube.com, deuxième sur nocookie, puis on renonce.
+  const fail = () => { if (attempt === 0) setAttempt(1); else setBlocked(true); };
+
+  if (!valid || blocked) {
+    return (
+      <View style={styles.blocked}>
+        <Ionicons name="videocam-off-outline" size={22} color={Colors.textMuted} />
+        <Text style={styles.blockedTitle}>
+          {valid ? 'Clip protégé : vidéo non intégrable ici' : 'Aperçu vidéo indisponible'}
+        </Text>
+        {onAudio ? (
+          <Pressable style={styles.audioBtn} onPress={onAudio}>
+            <Ionicons name="play" size={14} color={Colors.text} />
+            <Text style={styles.audioBtnText}>Écouter l’audio</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.blockedBtn} onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`)}>
+          <Ionicons name="open-outline" size={14} color={Colors.cyan} />
+          <Text style={styles.blockedBtnText}>Ouvrir dans YouTube</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const host = attempt === 0 ? 'https://www.youtube.com' : 'https://www.youtube-nocookie.com';
+  const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;height:100%;background:#000}</style></head><body><div id="p" style="position:absolute;inset:0"></div><script src="${host}/iframe_api"></script><script>var player;window.onYouTubeIframeAPIReady=function(){player=new YT.Player('p',{videoId:'${videoId}',playerVars:{playsinline:1,rel:0,modestbranding:1,origin:'${ORIGIN}',widget_referrer:'${ORIGIN}',autoplay:${autoPlay ? 1 : 0}},events:{onReady:function(e){if(${autoPlay ? 'true' : 'false'}){e.target.playVideo();}},onError:function(e){window.ReactNativeWebView.postMessage('err:'+e.data);}}});};</script></body></html>`;
+
+  return (
+    <WebView
+      key={`${videoId}-${attempt}`}
+      source={{ html, baseUrl: ORIGIN }}
+      style={styles.webview}
+      originWhitelist={['*']}
+      javaScriptEnabled
+      domStorageEnabled
+      mediaPlaybackRequiresUserAction={false}
+      allowsInlineMediaPlayback
+      allowsFullscreenVideo
+      onError={fail}
+      onMessage={(event) => { if (event.nativeEvent.data.startsWith('err:')) fail(); }}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  webview: { flex: 1, backgroundColor: '#000' },
+  blocked: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#0B0F18', padding: 12 },
+  blockedTitle: { color: Colors.textMuted, fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  audioBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: Colors.blue },
+  audioBtnText: { color: Colors.text, fontSize: 10, fontWeight: '900' },
+  blockedBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#0B2630' },
+  blockedBtnText: { color: Colors.cyan, fontSize: 10, fontWeight: '900' },
+});

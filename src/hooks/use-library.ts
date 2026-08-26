@@ -10,7 +10,14 @@ import {
   saveLibrary,
   savePlaylists,
 } from '@/lib/media';
-import type { AudixPlaylist, AudixTrack } from '@/types/media';
+import type { AudixPlaylist, AudixTrack, SmartRule, SystemPlaylist } from '@/types/media';
+
+/** Nom et couleur des playlists que l'app entretient toute seule. */
+const SYSTEM_META: Record<SystemPlaylist, { name: string; color: string }> = {
+  grab: { name: 'Grab', color: '#00D8E8' },
+  local: { name: 'Local', color: '#39E6A2' },
+  downloaded: { name: 'Downloaded', color: '#6C32FF' },
+};
 
 export function useLibrary() {
   const [tracks, setTracks] = useState<AudixTrack[]>([]);
@@ -89,11 +96,14 @@ export function useLibrary() {
   }, [tracks]);
 
   /** Metadata edit. Only descriptive fields — never uri, origin or id. */
-  const updateTrack = useCallback((id: string, changes: Partial<Pick<AudixTrack, 'title' | 'artist' | 'album'>>) => {
+  const updateTrack = useCallback((id: string, changes: Partial<Pick<AudixTrack, 'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'year'>>) => {
     const clean = {
       ...(changes.title !== undefined ? { title: changes.title.trim() || 'Sans titre' } : {}),
       ...(changes.artist !== undefined ? { artist: changes.artist.trim() || 'Artiste inconnu' } : {}),
       ...(changes.album !== undefined ? { album: changes.album.trim() || undefined } : {}),
+      ...(changes.genre !== undefined ? { genre: changes.genre?.trim() || undefined } : {}),
+      ...(changes.bpm !== undefined ? { bpm: changes.bpm || undefined } : {}),
+      ...(changes.year !== undefined ? { year: changes.year || undefined } : {}),
     };
     setTracks((existing) => existing.map((track) => (track.id === id ? { ...track, ...clean } : track)));
   }, []);
@@ -147,6 +157,110 @@ export function useLibrary() {
     )));
   }, []);
 
+  /**
+   * Range un titre dans une playlist automatique, en la creant au passage si
+   * elle n'existe pas encore. Tout se fait dans une seule mise a jour d'etat
+   * pour eviter les doublons quand plusieurs imports arrivent ensemble.
+   */
+  const addToSystemPlaylist = useCallback((kind: SystemPlaylist, trackIds: string[]) => {
+    if (!trackIds.length) return;
+    setPlaylists((existing) => {
+      const meta = SYSTEM_META[kind];
+      const found = existing.find((playlist) => playlist.system === kind)
+        ?? existing.find((playlist) => playlist.name.toLowerCase() === meta.name.toLowerCase());
+      const now = new Date().toISOString();
+      if (!found) {
+        const created: AudixPlaylist = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          name: meta.name,
+          description: 'Remplie automatiquement par Audix',
+          color: meta.color,
+          trackIds: [...trackIds],
+          createdAt: now,
+          updatedAt: now,
+          system: kind,
+        };
+        return [created, ...existing];
+      }
+      return existing.map((playlist) => (
+        playlist.id === found.id
+          ? {
+              ...playlist,
+              system: kind,
+              trackIds: [...playlist.trackIds, ...trackIds.filter((id) => !playlist.trackIds.includes(id))],
+              updatedAt: now,
+            }
+          : playlist
+      ));
+    });
+  }, []);
+
+  /** Retire un ou plusieurs titres d'une playlist, sans toucher a la bibliotheque. */
+  const removeTracksFromPlaylist = useCallback((playlistId: string, trackIds: string[]) => {
+    if (!trackIds.length) return;
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.id === playlistId
+        ? { ...playlist, trackIds: playlist.trackIds.filter((id) => !trackIds.includes(id)), updatedAt: new Date().toISOString() }
+        : playlist
+    )));
+  }, []);
+
+  /** Playlist intelligente : pas de liste figee, seulement des regles. */
+  const createSmartPlaylist = useCallback((name: string, smart: SmartRule, color = '#A71BFF') => {
+    const normalized = name.trim();
+    if (!normalized) throw new Error('Donne un nom à la playlist.');
+    if (playlists.some((playlist) => playlist.name.toLowerCase() === normalized.toLowerCase())) {
+      throw new Error('Une playlist porte déjà ce nom.');
+    }
+    const now = new Date().toISOString();
+    const playlist: AudixPlaylist = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name: normalized,
+      description: 'Sélection automatique par règles',
+      color,
+      trackIds: [],
+      createdAt: now,
+      updatedAt: now,
+      smart,
+    };
+    setPlaylists((existing) => [playlist, ...existing]);
+    return playlist;
+  }, [playlists]);
+
+  const updatePlaylistRule = useCallback((playlistId: string, smart: SmartRule) => {
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.id === playlistId ? { ...playlist, smart, updatedAt: new Date().toISOString() } : playlist
+    )));
+  }, []);
+
+  /**
+   * Fusionne ce qui vient du serveur avec ce qui est deja la. Les titres et
+   * playlists connus sont mis a jour, les inconnus ajoutes, et rien de local
+   * n'est supprime : un appareil qui a plus de contenu ne perd rien.
+   */
+  const mergeFromRemote = useCallback((remoteTracks: AudixTrack[], remotePlaylists: AudixPlaylist[]) => {
+    setTracks((existing) => {
+      const merged = [...existing];
+      remoteTracks.forEach((incoming) => {
+        const position = merged.findIndex((track) => track.id === incoming.id);
+        if (position === -1) merged.push(incoming);
+        // Le fichier local et l'etat hors ligne appartiennent a cet appareil.
+        else merged[position] = { ...incoming, uri: merged[position].uri, downloaded: merged[position].downloaded };
+      });
+      return merged;
+    });
+    setPlaylists((existing) => {
+      const merged = [...existing];
+      remotePlaylists.forEach((incoming) => {
+        const position = merged.findIndex((playlist) => playlist.id === incoming.id);
+        if (position === -1) merged.push(incoming);
+        else merged[position] = { ...merged[position], ...incoming };
+      });
+      return merged;
+    });
+    return { tracks: remoteTracks.length, playlists: remotePlaylists.length };
+  }, []);
+
   const deletePlaylist = useCallback((playlistId: string) => {
     setPlaylists((existing) => existing.filter((playlist) => playlist.id !== playlistId));
   }, []);
@@ -167,6 +281,11 @@ export function useLibrary() {
     updatePlaylist,
     toggleTrackInPlaylist,
     addTrackToPlaylist,
+    addToSystemPlaylist,
+    removeTracksFromPlaylist,
+    createSmartPlaylist,
+    updatePlaylistRule,
+    mergeFromRemote,
     deletePlaylist,
     ready,
   };
