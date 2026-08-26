@@ -4,9 +4,9 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Colors } from '@/constants/theme';
 
-type Props = { videoId: string; autoPlay?: boolean };
+type Props = { videoId: string; autoPlay?: boolean; onAudio?: () => void };
 
-export function YouTubeSurface({ videoId, autoPlay = false }: Props) {
+export function YouTubeSurface({ videoId, autoPlay = false, onAudio }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [blocked, setBlocked] = useState(false);
   const valid = /^[A-Za-z0-9_-]{6,20}$/.test(videoId ?? '');
@@ -19,8 +19,13 @@ export function YouTubeSurface({ videoId, autoPlay = false }: Props) {
     return (
       <View style={styles.blocked}>
         <Ionicons name="videocam-off-outline" size={22} color={Colors.textMuted} />
-        <Text style={styles.blockedTitle}>{valid ? 'Vidéo bloquée par YouTube ici' : 'Aperçu vidéo indisponible pour cette référence'}</Text>
-        <Text style={styles.blockedCopy}>Utilise le bouton lecture (audio sans pub) ou ouvre la source officielle.</Text>
+        <Text style={styles.blockedTitle}>{valid ? 'Clip protégé : vidéo non intégrable ici' : 'Aperçu vidéo indisponible'}</Text>
+        {onAudio ? (
+          <Pressable style={styles.audioBtn} onPress={onAudio}>
+            <Ionicons name="play" size={14} color={Colors.text} />
+            <Text style={styles.audioBtnText}>Écouter l’audio sans pub</Text>
+          </Pressable>
+        ) : null}
         <Pressable style={styles.blockedBtn} onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`)}>
           <Ionicons name="open-outline" size={14} color={Colors.cyan} />
           <Text style={styles.blockedBtnText}>Ouvrir dans YouTube</Text>
@@ -48,9 +53,10 @@ export function YouTubeSurface({ videoId, autoPlay = false }: Props) {
 
 const styles = StyleSheet.create({
   webview: { flex: 1, backgroundColor: '#000' },
-  blocked: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0B0F18', padding: 12 },
+  blocked: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#0B0F18', padding: 12 },
   blockedTitle: { color: Colors.textMuted, fontSize: 10, fontWeight: '800', textAlign: 'center' },
-  blockedCopy: { color: Colors.textMuted, fontSize: 8, textAlign: 'center', marginBottom: 4 },
+  audioBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: Colors.blue },
+  audioBtnText: { color: Colors.text, fontSize: 10, fontWeight: '900' },
   blockedBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#0B2630' },
   blockedBtnText: { color: Colors.cyan, fontSize: 10, fontWeight: '900' },
 });
