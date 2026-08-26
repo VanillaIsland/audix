@@ -68,6 +68,13 @@ export function useLibrary() {
     return imported;
   }, []);
 
+  /** Ajoute un titre déjà construit (mémo vocal, conversion, import externe). */
+  const addTrack = useCallback((track: AudixTrack) => {
+    setTracks((existing) => [track, ...existing]);
+    setCurrentId((value) => value ?? track.id);
+    return track;
+  }, []);
+
   const toggleFavorite = useCallback((id: string) => {
     setTracks((existing) => existing.map((track) => (track.id === id ? { ...track, favorite: !track.favorite } : track)));
   }, []);
@@ -227,6 +234,15 @@ export function useLibrary() {
     return playlist;
   }, [playlists]);
 
+  /** Bascule prive / public. Tout est prive tant qu'on ne le change pas. */
+  const togglePlaylistVisibility = useCallback((playlistId: string) => {
+    setPlaylists((existing) => existing.map((playlist) => (
+      playlist.id === playlistId
+        ? { ...playlist, isPublic: !playlist.isPublic, updatedAt: new Date().toISOString() }
+        : playlist
+    )));
+  }, []);
+
   const updatePlaylistRule = useCallback((playlistId: string, smart: SmartRule) => {
     setPlaylists((existing) => existing.map((playlist) => (
       playlist.id === playlistId ? { ...playlist, smart, updatedAt: new Date().toISOString() } : playlist
@@ -273,6 +289,7 @@ export function useLibrary() {
     setCurrentId,
     importFiles,
     importUrl,
+    addTrack,
     toggleFavorite,
     markPlayed,
     deleteTrack,
@@ -285,6 +302,7 @@ export function useLibrary() {
     removeTracksFromPlaylist,
     createSmartPlaylist,
     updatePlaylistRule,
+    togglePlaylistVisibility,
     mergeFromRemote,
     deletePlaylist,
     ready,

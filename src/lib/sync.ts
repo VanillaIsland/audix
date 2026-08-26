@@ -53,6 +53,7 @@ const playlistRow = (playlist: AudixPlaylist, userId: string) => ({
   name: playlist.name,
   description: playlist.description || null,
   is_smart: Boolean(playlist.smart),
+  is_shared: Boolean(playlist.isPublic),
   smart_rules: { rule: playlist.smart ?? null, system: playlist.system ?? null, color: playlist.color },
 });
 
@@ -90,7 +91,9 @@ export async function pushLibrary(tracks: AudixTrack[], playlists: AudixPlaylist
   // 3. La composition : on remplace, pour que les retraits soient répercutés.
   for (const playlist of playlists) {
     const remoteId = playlistIdByLocal.get(playlist.id);
-    if (!remoteId || playlist.smart) continue;
+    // Une playlist privée ne laisse qu'une ligne de texte sur le serveur : son
+    // nom. Sa composition ne part que si tu la passes en public.
+    if (!remoteId || playlist.smart || !playlist.isPublic) continue;
     await supabase.from('playlist_items').delete().eq('playlist_id', remoteId);
     const rows = playlist.trackIds
       .map((localId, position) => ({ playlist_id: remoteId, media_id: trackIdByLocal.get(localId), user_id: userId, position }))
@@ -173,7 +176,7 @@ export async function pullLibrary(): Promise<{ tracks: AudixTrack[]; playlists: 
 
   const { data: playlistRows, error: playlistError } = await supabase
     .from('playlists')
-    .select('id,local_id,name,description,is_smart,smart_rules,created_at,updated_at')
+    .select('id,local_id,name,description,is_smart,is_shared,smart_rules,created_at,updated_at')
     .order('created_at', { ascending: false });
   if (playlistError) throw new Error(`Récupération des playlists : ${playlistError.message}`);
 
@@ -198,6 +201,7 @@ export async function pullLibrary(): Promise<{ tracks: AudixTrack[]; playlists: 
       updatedAt: row.updated_at,
       system: rules.system ?? undefined,
       smart: row.is_smart ? (rules.rule ?? undefined) : undefined,
+      isPublic: Boolean(row.is_shared),
     };
   });
 

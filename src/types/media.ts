@@ -59,4 +59,9 @@ export type AudixPlaylist = {
   system?: SystemPlaylist;
   /** Presente uniquement sur les playlists intelligentes. */
   smart?: SmartRule;
+  /**
+   * Privee par defaut : le serveur ne garde alors que le nom, pas la
+   * composition. Une playlist publique envoie aussi la liste de ses titres.
+   */
+  isPublic?: boolean;
 };

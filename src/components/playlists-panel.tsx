@@ -20,6 +20,7 @@ type Props = {
   onCreateSmart: (name: string, rule: SmartRule) => void;
   onUpdate: (playlistId: string, changes: Partial<Pick<AudixPlaylist, 'name' | 'description' | 'color'>>) => void;
   onUpdateRule: (playlistId: string, rule: SmartRule) => void;
+  onToggleVisibility: (playlistId: string) => void;
   onAddTrack: (playlistId: string, trackId: string) => void;
   onRemoveTracks: (playlistId: string, trackIds: string[]) => void;
   onPlay: (trackId: string, context: AudixTrack[]) => void;
@@ -139,6 +140,7 @@ export function PlaylistsPanel({
   onCreateSmart,
   onUpdate,
   onUpdateRule,
+  onToggleVisibility,
   onAddTrack,
   onRemoveTracks,
   onPlay,
@@ -293,6 +295,18 @@ export function PlaylistsPanel({
             </View>
           </View>
 
+          <Pressable onPress={() => onToggleVisibility(open.id)} style={[styles.visibility, open.isPublic && styles.visibilityOn]}>
+            <Ionicons name={open.isPublic ? 'globe-outline' : 'lock-closed-outline'} size={16} color={open.isPublic ? Colors.cyan : Colors.textMuted} />
+            <View style={styles.visibilityCopy}>
+              <Text style={styles.visibilityTitle}>{open.isPublic ? 'Playlist publique' : 'Playlist privée'}</Text>
+              <Text style={styles.visibilityHint}>
+                {open.isPublic
+                  ? 'Le serveur garde son nom et la liste de ses titres.'
+                  : 'Le serveur ne garde que son nom. Sa composition reste sur l’appareil.'}
+              </Text>
+            </View>
+          </Pressable>
+
           {open.smart ? <RuleEditor rule={open.smart} onChange={(rule) => onUpdateRule(open.id, rule)} /> : null}
 
           <View style={styles.trackHeader}>
@@ -444,6 +458,11 @@ const styles = StyleSheet.create({
   palette: { flexDirection: 'row', gap: 8 },
   swatch: { width: 26, height: 26, borderRadius: 13 },
   swatchActive: { borderWidth: 2, borderColor: Colors.text },
+  visibility: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surfaceRaised },
+  visibilityOn: { borderColor: '#277E98', backgroundColor: '#0D202B' },
+  visibilityCopy: { flex: 1, gap: 2 },
+  visibilityTitle: { color: Colors.text, fontSize: 11, fontWeight: '800' },
+  visibilityHint: { color: Colors.textMuted, fontSize: 9, lineHeight: 13 },
   ruleBox: { gap: 8, padding: 11, borderRadius: 15, borderWidth: 1, borderColor: '#2A2140', backgroundColor: '#120E1D' },
   ruleRow: { flexDirection: 'row', gap: 8 },
   ruleInput: { flex: 1, minHeight: 40, paddingHorizontal: 11, borderRadius: 11, borderWidth: 1, borderColor: '#2C2444', backgroundColor: '#0A0812', color: Colors.text, fontSize: 11 },

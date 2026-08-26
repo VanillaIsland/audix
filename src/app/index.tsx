@@ -5,12 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DjDeck } from '@/components/dj-deck';
 import { FullPlayer } from '@/components/full-player';
 import { GrabPanel } from '@/components/grab-panel';
 import { GrabResults } from '@/components/grab-results';
 import { MiniPlayer } from '@/components/mini-player';
 import { Player } from '@/components/player';
 import { PlaylistsPanel } from '@/components/playlists-panel';
+import { VoiceRecorder } from '@/components/voice-recorder';
 import { TabBar, type TabItem } from '@/components/tab-bar';
 import { TrackActions } from '@/components/track-actions';
 import { YouTubeBrowser } from '@/components/youtube-browser';
@@ -18,6 +20,7 @@ import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { downloadYouTubeAudio } from '@/lib/downloader';
 import { analyseBpm } from '@/lib/bpm';
+import { importRecording } from '@/lib/media';
 import { usePlayback } from '@/lib/playback';
 import { pullLibrary, pushLibrary } from '@/lib/sync';
 import type { ProviderResult } from '@/lib/providers';
@@ -330,6 +333,19 @@ export default function HomeScreen() {
     }
   }, [library]);
 
+  /** Un mémo terminé rejoint la bibliothèque et la playlist Local. */
+  const saveRecording = useCallback(async (uri: string, seconds: number) => {
+    try {
+      const stamp = new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const track = await importRecording(uri, `Mémo ${stamp}`);
+      library.addTrack(track);
+      library.addToSystemPlaylist('local', [track.id]);
+      showNotice({ tone: 'success', text: `Mémo de ${seconds} seconde${seconds > 1 ? 's' : ''} ajouté à ta bibliothèque.` });
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Mémo non enregistré.' });
+    }
+  }, [library]);
+
   const currentSection = SECTIONS.find((item) => item.key === section) ?? SECTIONS[0];
 
   return (
@@ -359,6 +375,7 @@ export default function HomeScreen() {
             {library.current && !library.current.externalUrl ? (
               <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
             ) : null}
+            {playback.dj ? <DjDeck onNotice={(text) => showNotice({ tone: 'success', text })} /> : null}
             <YouTubeBrowser
               onSave={saveFromBrowser}
               onStream={streamFromBrowser}
@@ -369,6 +386,9 @@ export default function HomeScreen() {
             />
           </View>
 
+          {section === 'grab' ? (
+            <VoiceRecorder onSaved={saveRecording} onError={(text) => showNotice({ tone: 'danger', text })} />
+          ) : null}
           {section === 'grab' ? <GrabPanel url={grabUrl} onChangeUrl={setGrabUrl} rightsConfirmed={rightsConfirmed} onChangeRights={setRightsConfirmed} busy={grabBusy} playlists={library.playlists} targetPlaylistId={grabPlaylistId} onChangeTargetPlaylist={setGrabPlaylistId} onSubmit={grab} /> : null}
           {section === 'grab' ? (
             <GrabResults url={grabUrl} targetPlaylistName={library.playlists.find((p) => p.id === grabPlaylistId)?.name ?? null} onImport={importGrabFile} />
@@ -384,6 +404,7 @@ export default function HomeScreen() {
               onCreateSmart={(name, rule) => { try { library.createSmartPlaylist(name, rule); } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Création impossible.' }); } }}
               onUpdate={library.updatePlaylist}
               onUpdateRule={library.updatePlaylistRule}
+              onToggleVisibility={library.togglePlaylistVisibility}
               onAddTrack={library.addTrackToPlaylist}
               onRemoveTracks={(playlistId, ids) => { library.removeTracksFromPlaylist(playlistId, ids); showNotice({ tone: 'success', text: `${ids.length} titre${ids.length > 1 ? 's' : ''} retiré${ids.length > 1 ? 's' : ''} de la playlist.` }); }}
               onPlay={(id, context) => selectTrack(id, true, context)}

@@ -18,7 +18,8 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "Audix utilise le micro pour tes mémos vocaux, uniquement quand tu lances l'enregistrement."
       }
     },
     "android": {
@@ -42,6 +43,13 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#05070D"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Audix utilise le micro pour tes mémos vocaux, uniquement quand tu lances l'enregistrement.",
+          "enableBackgroundRecording": true
         }
       ]
     ],

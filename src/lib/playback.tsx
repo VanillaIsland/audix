@@ -31,6 +31,9 @@ const RESTART_THRESHOLD = 3;
 /** Volume ramp resolution. 50ms is inaudible as steps but cheap enough. */
 const FADE_TICK_MS = 50;
 
+/** Longueur minimale d'un raccord en mode DJ. */
+const DJ_BLEND_SECONDS = 6;
+
 type PlaybackValue = {
   current: AudixTrack | null;
   queue: AudixTrack[];
@@ -44,6 +47,8 @@ type PlaybackValue = {
   shuffle: boolean;
   /** Mode DJ : l'aléatoire enchaîne par genre, artiste et BPM proches. */
   dj: boolean;
+  /** Jingles joués par-dessus les transitions en mode DJ. */
+  djDrops: string[];
   repeat: RepeatMode;
   /** Crossfade length in seconds. 0 disables it entirely. */
   crossfade: number;
@@ -61,6 +66,10 @@ type PlaybackValue = {
   seekBy: (delta: number) => void;
   setRate: (rate: number) => void;
   toggleDj: () => void;
+  addDjDrop: (uri: string) => void;
+  removeDjDrop: (uri: string) => void;
+  /** Lance un jingle tout de suite, par-dessus la musique. */
+  fireDjDrop: (uri?: string) => void;
   setCrossfade: (seconds: number) => void;
   setVolume: (value: number) => void;
   toggleShuffle: () => void;
@@ -92,6 +101,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   // zero-crossfade path stays byte-for-byte the single-player behaviour.
   const deckA = useAudioPlayer(null, { updateInterval: 250 });
   const deckB = useAudioPlayer(null, { updateInterval: 250 });
+  // Troisième platine, réservée aux jingles : elle ne touche ni à la file ni
+  // au fondu, elle passe simplement par-dessus.
+  const dropDeck = useAudioPlayer(null, { updateInterval: 500 });
   const [onB, setOnB] = useState(false);
 
   const active = onB ? deckB : deckA;
@@ -104,6 +116,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [rate, setRateState] = useState(1);
   const [shuffle, setShuffle] = useState(false);
   const [dj, setDj] = useState(false);
+  const [djDrops, setDjDrops] = useState<string[]>([]);
   const [repeat, setRepeat] = useState<RepeatMode>('none');
   const [crossfade, setCrossfadeState] = useState(0);
   const [volume, setVolumeState] = useState(1);
@@ -116,6 +129,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   const repeatRef = useRef(repeat); repeatRef.current = repeat;
   const crossfadeRef = useRef(crossfade); crossfadeRef.current = crossfade;
+  const djRef = useRef(dj); djRef.current = dj;
+  const dropsRef = useRef(djDrops); dropsRef.current = djDrops;
   const volumeRef = useRef(volume); volumeRef.current = volume;
   const rateRef = useRef(rate); rateRef.current = rate;
 
@@ -188,7 +203,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     if (!isPlayable(incoming) || fading.current) return;
 
     fading.current = true;
-    const seconds = crossfadeRef.current;
+    // En mode DJ on garde toujours un raccord audible, même si le fondu manuel
+    // est à zéro : c'est ce qui fait la différence avec un simple enchaînement.
+    const seconds = djRef.current ? Math.max(crossfadeRef.current, DJ_BLEND_SECONDS) : crossfadeRef.current;
     const steps = Math.max(1, Math.round((seconds * 1000) / FADE_TICK_MS));
     const fromDeck = active;
     const toDeck = idle;
@@ -223,10 +240,11 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   // Watch the tail of the current track and start the fade in time.
   useEffect(() => {
-    if (crossfade <= 0 || fading.current || !current) return;
+    const blend = dj ? Math.max(crossfade, DJ_BLEND_SECONDS) : crossfade;
+    if (blend <= 0 || fading.current || !current) return;
     if (!status.playing || !status.duration) return;
     const remaining = status.duration - status.currentTime;
-    if (remaining > crossfade || remaining <= 0) return;
+    if (remaining > blend || remaining <= 0) return;
     if (repeatRef.current === 'one') return;
 
     const list = queueRef.current;
@@ -234,8 +252,20 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       indexRef.current + 1 < list.length ? indexRef.current + 1
       : repeatRef.current === 'all' ? 0
       : -1;
-    if (nextIndex >= 0) beginCrossfade(nextIndex);
-  }, [beginCrossfade, crossfade, current, status.currentTime, status.duration, status.playing]);
+    if (nextIndex < 0) return;
+    // Un jingle par-dessus le raccord, tiré au hasard parmi ceux chargés.
+    if (dj && dropsRef.current.length) {
+      const pick = dropsRef.current[Math.floor(Math.random() * dropsRef.current.length)];
+      try {
+        dropDeck.replace(pick);
+        dropDeck.volume = 0.9;
+        dropDeck.play();
+      } catch {
+        // Un jingle illisible ne doit jamais casser la transition.
+      }
+    }
+    beginCrossfade(nextIndex);
+  }, [beginCrossfade, crossfade, current, dj, dropDeck, status.currentTime, status.duration, status.playing]);
 
   // --- transport -----------------------------------------------------------
   const playTrack = useCallback((track: AudixTrack, nextQueue?: AudixTrack[]) => {
@@ -336,6 +366,26 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     });
   }, [baseQueue, shuffle]);
 
+  const addDjDrop = useCallback((uri: string) => {
+    setDjDrops((existing) => (existing.includes(uri) ? existing : [...existing, uri]));
+  }, []);
+
+  const removeDjDrop = useCallback((uri: string) => {
+    setDjDrops((existing) => existing.filter((item) => item !== uri));
+  }, []);
+
+  const fireDjDrop = useCallback((uri?: string) => {
+    const pick = uri ?? dropsRef.current[Math.floor(Math.random() * dropsRef.current.length)];
+    if (!pick) return;
+    try {
+      dropDeck.replace(pick);
+      dropDeck.volume = 0.9;
+      dropDeck.play();
+    } catch {
+      // Idem : un jingle qui refuse de se charger reste sans conséquence.
+    }
+  }, [dropDeck]);
+
   const cycleRepeat = useCallback(() => {
     setRepeat((mode) => (mode === 'none' ? 'all' : mode === 'all' ? 'one' : 'none'));
   }, []);
@@ -383,15 +433,16 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playing: status.playing ?? false,
     isBuffering: status.isBuffering ?? false,
     isLoaded: status.isLoaded ?? false,
-    rate, shuffle, dj, repeat, crossfade, volume,
+    rate, shuffle, dj, djDrops, repeat, crossfade, volume,
     hasNext: index >= 0 && (index + 1 < queue.length || repeat === 'all'),
     hasPrevious: index > 0 || repeat === 'all',
     playTrack, toggle, play, pause, next, previous, seekTo, seekBy,
-    toggleDj, setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
+    toggleDj, addDjDrop, removeDjDrop, fireDjDrop, setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
   }), [
     current, queue, index, status.currentTime, status.duration, status.playing,
-    status.isBuffering, status.isLoaded, rate, shuffle, repeat, crossfade, volume,
+    status.isBuffering, status.isLoaded, rate, shuffle, dj, djDrops, repeat, crossfade, volume,
     playTrack, toggle, play, pause, next, previous, seekTo, seekBy,
+    toggleDj, addDjDrop, removeDjDrop, fireDjDrop,
     setRate, setCrossfade, setVolume, toggleShuffle, cycleRepeat, stop, onTrackStart,
   ]);
 

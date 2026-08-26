@@ -234,3 +234,33 @@ export async function deleteTrackFile(track: AudixTrack): Promise<void> {
     // Disk removal failed; the entry still leaves the library.
   }
 }
+
+/**
+ * Range un enregistrement vocal dans la bibliothèque : le fichier temporaire du
+ * recorder est recopié dans le dossier d'Audix, sinon iOS peut le purger.
+ */
+export async function importRecording(sourceUri: string, title: string): Promise<AudixTrack> {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  let uri = sourceUri;
+  if (Platform.OS !== 'web') {
+    const directory = new Directory(Paths.document, 'audix-memos');
+    directory.create({ idempotent: true, intermediates: true });
+    const destination = new File(directory, `${id}.m4a`);
+    new File(sourceUri).copy(destination);
+    uri = destination.uri;
+  }
+  return {
+    id,
+    title,
+    artist: 'Mémo vocal',
+    uri,
+    mimeType: 'audio/m4a',
+    kind: 'audio',
+    origin: 'local',
+    downloaded: Platform.OS !== 'web',
+    favorite: false,
+    rightsConfirmed: true,
+    addedAt: new Date().toISOString(),
+    playCount: 0,
+  };
+}
