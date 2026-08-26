@@ -18,7 +18,7 @@ import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { downloadYouTubeAudio } from '@/lib/downloader';
 import { usePlayback } from '@/lib/playback';
-import { searchYouTube, type ProviderResult } from '@/lib/providers';
+import type { ProviderResult } from '@/lib/providers';
 import type { MediaOrigin, AudixPlaylist, AudixTrack } from '@/types/media';
 
 type Section = 'play' | 'recent' | 'downloads' | 'favorites' | 'playlists' | 'grab';
@@ -46,8 +46,6 @@ const ORIGIN_LABELS: Record<MediaOrigin, string> = {
 };
 
 const sizeLabel = (bytes?: number) => !bytes ? 'En ligne' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.round(bytes / 1_000)} Ko`;
-
-void searchYouTube;
 
 function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
   return (
@@ -178,8 +176,22 @@ export default function HomeScreen() {
     }
   }, [library]);
 
-  // VRAI TÉLÉCHARGEMENT MP3 via le serveur yt-dlp, puis playlist auto « Downloaded »
-    const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
+  // LECTURE AUDIO SANS PUB : stream MP3 depuis ton serveur Render, via le moteur audio natif
+  const streamFromBrowser = useCallback(async (result: ProviderResult) => {
+    try {
+      showNotice({ tone: 'info', text: 'Préparation du flux audio sans pub…' });
+      const direct = await downloadYouTubeAudio(result.id);
+      const imported = await library.importUrl(direct.url, false);
+      library.updateTrack(imported.id, { title: result.title, artist: result.artist });
+      library.setCurrentId(imported.id);
+      playback.playTrack(imported, [imported]);
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Lecture impossible.' });
+    }
+  }, [library, playback]);
+
+  // TÉLÉCHARGEMENT MP3 + playlist auto « Downloaded »
+  const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
       showNotice({ tone: 'info', text: 'Conversion MP3 en cours… (1-2 min)' });
       const direct = await downloadYouTubeAudio(result.id);
@@ -196,20 +208,6 @@ export default function HomeScreen() {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Téléchargement impossible.' });
     }
   }, [library]);
-
-  // Lecture audio SANS PUB : stream MP3 depuis ton serveur, via le moteur audio natif
-  const streamFromBrowser = useCallback(async (result: ProviderResult) => {
-    try {
-      showNotice({ tone: 'info', text: 'Préparation du flux audio sans pub…' });
-      const direct = await downloadYouTubeAudio(result.id);
-      const imported = await library.importUrl(direct.url, false);
-      library.updateTrack(imported.id, { title: result.title, artist: result.artist });
-      library.setCurrentId(imported.id);
-      playback.playTrack(imported, [imported]);
-    } catch (error) {
-      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Lecture impossible.' });
-    }
-  }, [library, playback]);
 
   const addToPlaylistFromBrowser = useCallback((result: ProviderResult) => {
     setNewPlOpen(false);
@@ -262,12 +260,6 @@ export default function HomeScreen() {
     }
   }, [grabPlaylistId, library, rightsConfirmed]);
 
-  const addCatalogResult = async (url: string) => {
-    try { await importLink(url); showNotice({ tone: 'success', text: 'Résultat YouTube ajouté au lecteur officiel Audix.' }); }
-    catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Ajout impossible.' }); }
-  };
-  void addCatalogResult;
-
   const currentSection = SECTIONS.find((item) => item.key === section) ?? SECTIONS[0];
 
   return (
@@ -290,20 +282,20 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {section === 'play' ? (
-            <View style={styles.sectionStack}>
-              {library.current && !library.current.externalUrl ? (
-                <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
-              ) : null}
-              <YouTubeBrowser
-                onSave={saveFromBrowser}
-                onDownload={downloadFromBrowser}
-                onAddToPlaylist={addToPlaylistFromBrowser}
-                savedQuery={searchQuery}
-                onQueryChange={setSearchQuery}
-              />
-            </View>
-          ) : null}
+          {/* SECTION TOUJOURS MONTÉE (masquée hors onglet Lecture) → recherche + résultats conservés */}
+          <View style={[styles.sectionStack, section !== 'play' && { display: 'none' }]}>
+            {library.current && !library.current.externalUrl ? (
+              <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
+            ) : null}
+            <YouTubeBrowser
+              onSave={saveFromBrowser}
+              onStream={streamFromBrowser}
+              onDownload={downloadFromBrowser}
+              onAddToPlaylist={addToPlaylistFromBrowser}
+              savedQuery={searchQuery}
+              onQueryChange={setSearchQuery}
+            />
+          </View>
 
           {section === 'grab' ? <GrabPanel url={grabUrl} onChangeUrl={setGrabUrl} rightsConfirmed={rightsConfirmed} onChangeRights={setRightsConfirmed} busy={grabBusy} playlists={library.playlists} targetPlaylistId={grabPlaylistId} onChangeTargetPlaylist={setGrabPlaylistId} onSubmit={grab} /> : null}
           {section === 'grab' ? (
