@@ -11,6 +11,8 @@ type Props = {
   onSave: (id: string, changes: { title: string; artist: string; album: string; genre: string; bpm?: number }) => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  /** Analyse le tempo du fichier local. Absent pour les références en ligne. */
+  onAnalyseBpm?: (track: AudixTrack) => void;
 };
 
 /**
@@ -18,7 +20,7 @@ type Props = {
  * track. Deletion asks for confirmation in-place because it also erases the
  * offline file.
  */
-export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorite }: Props) {
+export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorite, onAnalyseBpm }: Props) {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [album, setAlbum] = useState('');
@@ -67,6 +69,12 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
             <View style={styles.field}>
               <Text style={styles.label}>BPM</Text>
               <TextInput value={bpm} onChangeText={setBpm} keyboardType="number-pad" style={styles.input} placeholderTextColor="#50586F" placeholder="Tempo, utilisé par le mode DJ" />
+              {onAnalyseBpm && track.uri.startsWith('file:') ? (
+                <Pressable onPress={() => onAnalyseBpm(track)} style={styles.analyseBtn}>
+                  <Ionicons name="pulse-outline" size={15} color={Colors.cyan} />
+                  <Text style={styles.analyseText}>Détecter le tempo automatiquement</Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <Pressable style={styles.row} onPress={() => onToggleFavorite(track.id)}>
@@ -117,6 +125,8 @@ export function TrackActions({ track, onClose, onSave, onDelete, onToggleFavorit
 }
 
 const styles = StyleSheet.create({
+  analyseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 7, minHeight: 40, borderRadius: 12, borderWidth: 1, borderColor: '#27566A', backgroundColor: '#0B1E27' },
+  analyseText: { color: Colors.cyan, fontSize: 11, fontWeight: '700' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   dock: { flex: 1, justifyContent: 'flex-end' },
   sheet: { maxHeight: '86%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: Colors.surface, paddingTop: 8 },

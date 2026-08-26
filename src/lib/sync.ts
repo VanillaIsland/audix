@@ -8,14 +8,18 @@ import type { AudixPlaylist, AudixTrack, SmartRule, SystemPlaylist } from '@/typ
  * téléchargements depuis les sources d'origine.
  */
 
-/** Ouvre une session anonyme si aucune n'existe. Idempotent. */
+/**
+ * Ouvre une session anonyme si aucune n'existe. Idempotent. L'erreur remonte
+ * telle quelle : « Anonymous sign-ins are disabled » veut dire que l'option
+ * n'est pas activée côté Supabase, et c'est utile de le lire.
+ */
 export async function ensureSession(): Promise<string | null> {
-  if (!supabase) return null;
+  if (!supabase) throw new Error('Supabase n’est pas configuré dans ce build.');
   const { data } = await supabase.auth.getSession();
   if (data.session?.user?.id) return data.session.user.id;
 
   const { data: created, error } = await supabase.auth.signInAnonymously();
-  if (error) return null;
+  if (error) throw new Error(`Connexion au compte de synchronisation : ${error.message}`);
   return created.session?.user?.id ?? null;
 }
 

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { setAudioModeAsync } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,6 +17,7 @@ import { YouTubeBrowser } from '@/components/youtube-browser';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
 import { downloadYouTubeAudio } from '@/lib/downloader';
+import { analyseBpm } from '@/lib/bpm';
 import { usePlayback } from '@/lib/playback';
 import { pullLibrary, pushLibrary } from '@/lib/sync';
 import type { ProviderResult } from '@/lib/providers';
@@ -117,14 +117,9 @@ export default function HomeScreen() {
   const [newPlOpen, setNewPlOpen] = useState(false);
   const [newPlName, setNewPlName] = useState('');
 
-  // Lecture continue écran verrouillé / app en arrière-plan
-  useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      staysActiveInBackground: true,
-      shouldPlayInBackground: true,
-    } as any).catch(() => undefined);
-  }, []);
+  // La session audio (écran verrouillé, arrière-plan) est configurée une seule
+  // fois, dans PlaybackProvider. Un second appel avec des clés d'un ancien SDK
+  // écrasait ce réglage et laissait le lecteur bloqué sur « Chargement ».
 
   const visibleTracks = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -190,8 +185,14 @@ export default function HomeScreen() {
       const count = await library.importFiles(grabPlaylistId);
       if (count) {
         // Les imports depuis le téléphone se retrouvent aussi dans « Local ».
-        const latest = library.tracks.slice(0, count).map((track) => track.id);
-        library.addToSystemPlaylist('local', latest);
+        const imported = library.tracks.slice(0, count);
+        library.addToSystemPlaylist('local', imported.map((track) => track.id));
+        // Le tempo se calcule en arrière-plan, sans bloquer l'import.
+        imported.forEach((track) => {
+          analyseBpm(track.uri)
+            .then((bpm) => { if (bpm) library.updateTrack(track.id, { bpm }); })
+            .catch(() => undefined);
+        });
         showNotice({ tone: 'success', text: `${count} média${count > 1 ? 's' : ''} ajouté${count > 1 ? 's' : ''} à la bibliothèque.` });
       }
     } catch (error) { showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Import impossible.' }); }
@@ -312,6 +313,23 @@ export default function HomeScreen() {
     }
   }, [grabPlaylistId, library, rightsConfirmed]);
 
+  /** Analyse manuelle du tempo, depuis la feuille d'un titre. */
+  const analyseTrackBpm = useCallback(async (track: AudixTrack) => {
+    showNotice({ tone: 'info', text: 'Analyse du tempo en cours…' });
+    try {
+      const bpm = await analyseBpm(track.uri);
+      if (!bpm) {
+        showNotice({ tone: 'danger', text: 'Tempo introuvable sur ce fichier. Saisis-le à la main.' });
+        return;
+      }
+      library.updateTrack(track.id, { bpm });
+      setActionTrack((open) => (open && open.id === track.id ? { ...open, bpm } : open));
+      showNotice({ tone: 'success', text: `Tempo détecté : ${bpm} BPM.` });
+    } catch {
+      showNotice({ tone: 'danger', text: 'Analyse impossible sur ce fichier.' });
+    }
+  }, [library]);
+
   const currentSection = SECTIONS.find((item) => item.key === section) ?? SECTIONS[0];
 
   return (
@@ -407,6 +425,7 @@ export default function HomeScreen() {
         onSave={(id, changes) => { library.updateTrack(id, changes); showNotice({ tone: 'success', text: 'Informations mises à jour.' }); }}
         onDelete={(id) => { library.deleteTrack(id).catch(() => undefined); showNotice({ tone: 'success', text: 'Titre supprimé de la bibliothèque.' }); }}
         onToggleFavorite={(id) => { library.toggleFavorite(id); setActionTrack((t) => (t ? { ...t, favorite: !t.favorite } : t)); }}
+        onAnalyseBpm={analyseTrackBpm}
       />
 
       <ConfirmDialog
