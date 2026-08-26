@@ -18,7 +18,7 @@ import { TrackActions } from '@/components/track-actions';
 import { YouTubeBrowser } from '@/components/youtube-browser';
 import { Colors, Gradients, Radius } from '@/constants/theme';
 import { useLibrary } from '@/hooks/use-library';
-import { downloadYouTubeAudio } from '@/lib/downloader';
+import { downloadYouTubeAudio, streamYouTubeAudio } from '@/lib/downloader';
 import { analyseBpm } from '@/lib/bpm';
 import { importRecording } from '@/lib/media';
 import { usePlayback } from '@/lib/playback';
