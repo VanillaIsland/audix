@@ -110,7 +110,7 @@ export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, 
 
       {playing ? (
         <Pressable onPress={() => setExpanded(true)} style={styles.miniWrap}>
-          <View style={styles.miniVideo}><YouTubeSurface videoId={playing.id} /></View>
+          <View style={styles.miniVideo}><YouTubeSurface videoId={playing.id} onAudio={() => playAudio(playing)} /></View>
           <View style={styles.miniCopy}>
             <Text style={styles.miniArtist} numberOfLines={1}>{playing.artist}</Text>
             <Text style={styles.miniTitle} numberOfLines={2}>{playing.title}</Text>
@@ -176,7 +176,7 @@ export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, 
               <Ionicons name="heart-outline" size={21} color={Colors.purple} />
             </Pressable>
           </View>
-          <View style={styles.fullVideo}>{playing ? <YouTubeSurface videoId={playing.id} autoPlay /> : null}</View>
+          <View style={styles.fullVideo}>{playing ? <YouTubeSurface videoId={playing.id} autoPlay onAudio={() => playAudio(playing)} /> : null}</View>
         </View>
       </Modal>
     </View>
