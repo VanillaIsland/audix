@@ -8,13 +8,14 @@ import { searchYouTube, type ProviderResult } from '@/lib/providers';
 
 type Props = {
   onSave: (result: ProviderResult, favorite: boolean) => void;
+  onStream?: (result: ProviderResult) => void;
   onDownload?: (result: ProviderResult) => void;
   onAddToPlaylist?: (result: ProviderResult) => void;
   savedQuery?: string;
   onQueryChange?: (query: string) => void;
 };
 
-export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery = '', onQueryChange }: Props) {
+export function YouTubeBrowser({ onSave, onStream, onDownload, onAddToPlaylist, savedQuery = '', onQueryChange }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState(savedQuery);
   const [results, setResults] = useState<ProviderResult[]>([]);
@@ -23,9 +24,7 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
   const [playing, setPlaying] = useState<ProviderResult | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    setQuery(savedQuery);
-  }, [savedQuery]);
+  useEffect(() => { setQuery(savedQuery); }, [savedQuery]);
 
   const run = useCallback(async () => {
     const term = query.trim();
@@ -45,25 +44,24 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
     }
   }, [query, onQueryChange]);
 
+  const playAudio = useCallback((item: ProviderResult) => {
+    if (onStream) onStream(item);
+    else setPlaying(item);
+  }, [onStream]);
+
   const renderRow = useCallback(({ item }: { item: ProviderResult }) => {
-    const active = playing?.id === item.id;
     return (
-      <View style={[styles.row, active && styles.rowActive]}>
+      <View style={styles.row}>
         <Pressable onPress={() => setPlaying(item)} style={styles.thumbWrap}>
           {item.thumbnail ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} /> : <View style={styles.thumb} />}
-          {active ? (
-            <View style={styles.thumbBadge}>
-              <Ionicons name="volume-high" size={13} color={Colors.text} />
-            </View>
-          ) : null}
         </Pressable>
         <Pressable onPress={() => setPlaying(item)} style={styles.rowCopy}>
           <Text style={styles.rowArtist} numberOfLines={1}>{item.artist}</Text>
           <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
         </Pressable>
         <View style={styles.rowActions}>
-          <Pressable accessibilityLabel={`Lire ${item.title}`} onPress={() => setPlaying(item)} hitSlop={6} style={[styles.playBtn, active && styles.playBtnOn]}>
-            <Ionicons name={active ? 'pause' : 'play'} size={17} color={Colors.text} />
+          <Pressable accessibilityLabel={`Écouter ${item.title} sans pub`} onPress={() => playAudio(item)} hitSlop={6} style={styles.playBtn}>
+            <Ionicons name="play" size={17} color={Colors.text} />
           </Pressable>
           <Pressable accessibilityLabel="Ajouter aux favoris" onPress={() => onSave(item, true)} hitSlop={6} style={styles.iconBtn}>
             <Ionicons name="heart-outline" size={18} color={Colors.purple} />
@@ -84,7 +82,7 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
         </View>
       </View>
     );
-  }, [onSave, onDownload, onAddToPlaylist, playing?.id]);
+  }, [onSave, onDownload, onAddToPlaylist, playAudio]);
 
   return (
     <View style={styles.screen}>
@@ -92,10 +90,7 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
         <Ionicons name="search" size={17} color={Colors.textMuted} />
         <TextInput
           value={query}
-          onChangeText={(text) => {
-            setQuery(text);
-            if (onQueryChange) onQueryChange(text);
-          }}
+          onChangeText={(text) => { setQuery(text); if (onQueryChange) onQueryChange(text); }}
           onSubmitEditing={run}
           placeholder="Rechercher un titre, un artiste…"
           placeholderTextColor="#50586F"
@@ -119,11 +114,8 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
           <View style={styles.miniCopy}>
             <Text style={styles.miniArtist} numberOfLines={1}>{playing.artist}</Text>
             <Text style={styles.miniTitle} numberOfLines={2}>{playing.title}</Text>
-            <Text style={styles.miniHint}>Appuie sur la vidéo pour l’agrandir</Text>
-            <Pressable
-              onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${playing.id}`)}
-              hitSlop={8}
-              style={styles.miniLink}>
+            <Text style={styles.miniHint}>Aperçu vidéo · ▶ lance l’audio sans pub</Text>
+            <Pressable onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${playing.id}`)} hitSlop={8} style={styles.miniLink}>
               <Ionicons name="open-outline" size={12} color={Colors.cyan} />
               <Text style={styles.miniLinkText}>Vidéo bloquée ici ? Ouvrir dans YouTube</Text>
             </Pressable>
@@ -153,7 +145,7 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
               <Ionicons name="search-outline" size={26} color={Colors.textMuted} />
               <Text style={styles.emptyTitle}>Cherche dans ton catalogue</Text>
               <Text style={styles.emptyCopy}>
-                Tape un titre ou un artiste. Les résultats se lisent ici même, en miniature, pendant que tu continues de parcourir la liste.
+                ▶ = écoute immédiate sans pub · nuage = téléchargement MP3 hors ligne · miniature = aperçu vidéo.
               </Text>
             </View>
           )
@@ -170,9 +162,9 @@ export function YouTubeBrowser({ onSave, onDownload, onAddToPlaylist, savedQuery
               <Text style={styles.miniArtist} numberOfLines={1}>{playing?.artist}</Text>
               <Text style={styles.fullTitle} numberOfLines={1}>{playing?.title}</Text>
             </View>
-            {onAddToPlaylist && playing ? (
-              <Pressable accessibilityLabel="Ajouter à une playlist" onPress={() => onAddToPlaylist(playing)} hitSlop={10} style={styles.iconBtn}>
-                <Ionicons name="albums-outline" size={21} color={Colors.blue} />
+            {playing ? (
+              <Pressable accessibilityLabel="Écouter sans pub" onPress={() => playAudio(playing)} hitSlop={10} style={styles.playBtn}>
+                <Ionicons name="play" size={17} color={Colors.text} />
               </Pressable>
             ) : null}
             {onDownload && playing ? (
@@ -207,16 +199,13 @@ const styles = StyleSheet.create({
   miniLinkText: { color: Colors.cyan, fontSize: 9, fontWeight: '800' },
   list: { gap: 8, paddingBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 14, backgroundColor: Colors.surface },
-  rowActive: { backgroundColor: '#12233A' },
   thumbWrap: { width: 96, height: 54, borderRadius: 9, overflow: 'hidden', backgroundColor: Colors.surfaceRaised },
   thumb: { width: '100%', height: '100%' },
-  thumbBadge: { position: 'absolute', right: 4, bottom: 4, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.65)' },
   rowCopy: { flex: 1, minWidth: 0, gap: 2 },
   rowArtist: { color: Colors.textMuted, fontSize: 9, fontWeight: '800' },
   rowTitle: { color: Colors.text, fontSize: 12, fontWeight: '800', lineHeight: 16 },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   playBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: Colors.blue },
-  playBtnOn: { backgroundColor: Colors.purple },
   iconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
   message: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 12, backgroundColor: '#241B0F' },
   messageText: { flex: 1, color: '#C5A56F', fontSize: 10, lineHeight: 15 },
