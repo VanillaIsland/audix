@@ -45,7 +45,6 @@ const TABS: readonly TabItem<Exclude<Section, 'grab'>>[] = [
 const ORIGIN_LABELS: Record<MediaOrigin, string> = {
   local: 'Local', direct: 'Direct', 'youtube-export': 'YouTube', 'facebook-export': 'Facebook', 'spotify-catalog': 'Spotify',
 };
-
 const sizeLabel = (bytes?: number) => !bytes ? 'En ligne' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.round(bytes / 1_000)} Ko`;
 
 function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
@@ -245,6 +244,16 @@ export default function HomeScreen() {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Création impossible.' });
     }
   };
+  
+  // Lecture continue écran verrouillé / app en arrière-plan
+  const createAndAdd = async () => {
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      staysActiveInBackground: true,
+      shouldPlayInBackground: true,
+    } as any).catch(() => undefined);
+  }, []);
 
   const importGrabFile = useCallback(async (file: { url: string; name: string }, keepOffline: boolean) => {
     if (!rightsConfirmed) {
