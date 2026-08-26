@@ -45,6 +45,7 @@ const TABS: readonly TabItem<Exclude<Section, 'grab'>>[] = [
 const ORIGIN_LABELS: Record<MediaOrigin, string> = {
   local: 'Local', direct: 'Direct', 'youtube-export': 'YouTube', 'facebook-export': 'Facebook', 'spotify-catalog': 'Spotify',
 };
+
 const sizeLabel = (bytes?: number) => !bytes ? 'En ligne' : bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.round(bytes / 1_000)} Ko`;
 
 function TrackRow({ track, active, onSelect, onFavorite, onMore }: { track: AudixTrack; active: boolean; onSelect: () => void; onFavorite: () => void; onMore: () => void }) {
@@ -114,6 +115,15 @@ export default function HomeScreen() {
   const [newPlOpen, setNewPlOpen] = useState(false);
   const [newPlName, setNewPlName] = useState('');
 
+  // Lecture continue écran verrouillé / app en arrière-plan
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      staysActiveInBackground: true,
+      shouldPlayInBackground: true,
+    } as any).catch(() => undefined);
+  }, []);
+
   const visibleTracks = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     let items = [...library.tracks];
@@ -176,7 +186,6 @@ export default function HomeScreen() {
     }
   }, [library]);
 
-  // LECTURE AUDIO SANS PUB : stream MP3 depuis ton serveur Render, via le moteur audio natif
   const streamFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
       showNotice({ tone: 'info', text: 'Préparation du flux audio sans pub…' });
@@ -190,7 +199,6 @@ export default function HomeScreen() {
     }
   }, [library, playback]);
 
-  // TÉLÉCHARGEMENT MP3 + playlist auto « Downloaded »
   const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
       showNotice({ tone: 'info', text: 'Conversion MP3 en cours… (1-2 min)' });
@@ -244,16 +252,6 @@ export default function HomeScreen() {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Création impossible.' });
     }
   };
-  
-  // Lecture continue écran verrouillé / app en arrière-plan
-  const createAndAdd = async () => {
-  useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      staysActiveInBackground: true,
-      shouldPlayInBackground: true,
-    } as any).catch(() => undefined);
-  }, []);
 
   const importGrabFile = useCallback(async (file: { url: string; name: string }, keepOffline: boolean) => {
     if (!rightsConfirmed) {
@@ -292,7 +290,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* SECTION TOUJOURS MONTÉE (masquée hors onglet Lecture) → recherche + résultats conservés */}
           <View style={[styles.sectionStack, section !== 'play' && { display: 'none' }]}>
             {library.current && !library.current.externalUrl ? (
               <Player track={library.current} onImport={importFiles} onToggleFavorite={library.toggleFavorite} />
