@@ -14,6 +14,7 @@
       "bundleIdentifier": "com.vanillaisland.audix",
       "infoPlist": {
         "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "package": "ai.daaudix.app",
