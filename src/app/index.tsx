@@ -179,19 +179,37 @@ export default function HomeScreen() {
   }, [library]);
 
   // VRAI TÉLÉCHARGEMENT MP3 via le serveur yt-dlp, puis playlist auto « Downloaded »
-  const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
+    const downloadFromBrowser = useCallback(async (result: ProviderResult) => {
     try {
-      showNotice({ tone: 'info', text: 'Conversion MP3 en cours… (peut prendre 1 minute)' });
+      showNotice({ tone: 'info', text: 'Conversion MP3 en cours… (1-2 min)' });
       const direct = await downloadYouTubeAudio(result.id);
       const imported = await library.importUrl(direct.url, true);
       library.updateTrack(imported.id, { title: result.title, artist: result.artist });
-      const downloaded = library.playlists.find((p) => p.name.toLowerCase() === 'downloaded');
-      if (downloaded) library.addTrackToPlaylist(downloaded.id, imported.id);
-      showNotice({ tone: 'success', text: `« ${result.title} » téléchargé en MP3 et dispo hors ligne.` });
+      let dl = library.playlists.find((p) => p.name.toLowerCase() === 'downloaded');
+      if (!dl) {
+        const created: any = await library.createPlaylist('Downloaded');
+        dl = created?.id ? created : library.playlists.find((p) => p.name.toLowerCase() === 'downloaded');
+      }
+      if (dl) library.addTrackToPlaylist(dl.id, imported.id);
+      showNotice({ tone: 'success', text: `« ${result.title} » téléchargé — dispo dans Hors ligne${dl ? ' + playlist Downloaded' : ''}.` });
     } catch (error) {
       showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Téléchargement impossible.' });
     }
   }, [library]);
+
+  // Lecture audio SANS PUB : stream MP3 depuis ton serveur, via le moteur audio natif
+  const streamFromBrowser = useCallback(async (result: ProviderResult) => {
+    try {
+      showNotice({ tone: 'info', text: 'Préparation du flux audio sans pub…' });
+      const direct = await downloadYouTubeAudio(result.id);
+      const imported = await library.importUrl(direct.url, false);
+      library.updateTrack(imported.id, { title: result.title, artist: result.artist });
+      library.setCurrentId(imported.id);
+      playback.playTrack(imported, [imported]);
+    } catch (error) {
+      showNotice({ tone: 'danger', text: error instanceof Error ? error.message : 'Lecture impossible.' });
+    }
+  }, [library, playback]);
 
   const addToPlaylistFromBrowser = useCallback((result: ProviderResult) => {
     setNewPlOpen(false);
